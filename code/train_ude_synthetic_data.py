@@ -1,11 +1,13 @@
 import jax
 import json
 import sys
+import pickle
 import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 from datetime import datetime
 from pathlib import Path
+import equinox as eqx
 
 from utils.models import (
     ude_models,
@@ -48,6 +50,10 @@ experiment_name = (
 experiment_folder = Path(project_root) / "experiments" / experiment_name
 experiment_folder.mkdir(parents=True, exist_ok=True)
 print(f"Experiment folder created at: {experiment_folder}")
+
+# Save the configuration used for this experiment
+with open(experiment_folder / "config.json", "w") as f:
+    json.dump(config, f, indent=4)
 
 print("Extracting parameters and data from config file.")
 t0 = config["time_start"]
@@ -119,6 +125,16 @@ if pre_equilibration:
 else:
     model_params_after_equilibration = model_params
 
+np.savetxt(
+    Path(experiment_folder) / "initial_conditions_after_pre_equilibration.csv",
+    initial_conditions,
+    delimiter=",",
+    fmt="%.6f",
+)
+print(
+    f"Initial conditions saved to {experiment_folder}/initial_conditions_after_pre_equilibration.csv"
+)
+
 print("Starting the training of the UDE model")
 trained_vars, epoch_losses = train_ude(
     model_params_after_equilibration,
@@ -153,7 +169,12 @@ plot_training_loss(
 
 print("Training completed.")
 
+# get final learned neural network and save its parameters
 neural_net_final = trained_vars["nn"]
+eqx.tree_serialise_leaves(
+    Path(experiment_folder) / "neural_network.eqx", neural_net_final
+)
+
 learned_model_params = unconstrained_to_ode_space(
     trained_vars["model_params"], min_p, max_p
 )
@@ -218,6 +239,22 @@ nfkb_flat, true_synth_factor, pred_synth_factor = get_true_vs_learned_factor_val
     time_points,
     func_type,
 )
+
+# Save learned factor values to CSV
+learned_factor_df = pd.DataFrame(
+    {
+        "nfkb_flat": np.array(nfkb_flat),
+        "true_synth_factor": np.array(true_synth_factor),
+        "pred_synth_factor": np.array(pred_synth_factor),
+    }
+)
+learned_factor_df.to_csv(
+    Path(experiment_folder) / "learned_vs_true_crosstalk_factor_values.csv", index=False
+)
+print(
+    f"Learned factor values saved to {experiment_folder}/learned_vs_true_crosstalk_factor_values.csv"
+)
+
 plot_data(
     nfkb_flat,
     true_synth_factor,
@@ -234,10 +271,17 @@ plot_data(
 )
 
 print("Running symbolic regression to extract learned crosstalk function.")
-symbolic_reg_function, s_r_params = run_symbolic_regression(
+symbolic_reg_function, s_r_params, symbolic_model = run_symbolic_regression(
     experiment_folder=experiment_folder,
     input=nfkb_flat.reshape((-1, 1)),
     predictions=pred_synth_factor.reshape((-1, 1)),
+)
+
+# Save the symbolic regression model
+with open(Path(experiment_folder) / "symbolic_regression_model.pkl", "wb") as f:
+    pickle.dump(symbolic_model, f)
+print(
+    f"Symbolic regression model saved to {experiment_folder}/symbolic_regression_model.pkl"
 )
 
 

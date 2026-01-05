@@ -69,4 +69,4 @@ def run_symbolic_regression(experiment_folder, input, predictions):
     function = model_jax["callable"]
     parameters = model_jax["parameters"]
 
-    return function, parameters
+    return function, parameters, model
