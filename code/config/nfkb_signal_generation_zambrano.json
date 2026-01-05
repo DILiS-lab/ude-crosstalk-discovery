@@ -1,0 +1,32 @@
+{
+    "action": "nfkb_signal_generation",
+    "time_start": 0.0,
+    "time_end": 19.9,
+    "time_step": 0.1,
+    "initial_conditions": [
+        1,
+        0.02049,
+        0.72855,
+        0.01387,
+        0.018387
+    ],
+    "model_name": "nfkb_zambrano",
+    "model_parameters": [
+        0.15,
+        3,
+        0.2,
+        0.24,
+        9,
+        200,
+        0.2,
+        16,
+        2.7,
+        7.5,
+        15
+    ],
+    "solver_max_steps": 10000,
+    "solver_dt0": 0.01,
+    "n_signals": 246,
+    "change_scale": 0.1,
+    "sample_initial_conditions": true
+}

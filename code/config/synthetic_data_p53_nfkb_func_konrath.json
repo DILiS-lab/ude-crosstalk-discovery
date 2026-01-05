@@ -1,0 +1,24 @@
+{
+    "action": "synthetic_data_generation_nfkb",
+    "time_start": 0.0,
+    "time_end": 19.9,
+    "time_step": 0.1,
+    "pre_equilibration_end": 71.9,
+    "initial_conditions": "experiments/synthetic_data_konrath2020_no_nfkb_2025-11-25_203245/sampled_initial_conditions.csv",
+    "model_parameters": "experiments/synthetic_data_konrath2020_no_nfkb_2025-11-25_203245/sampled_parameters.csv",
+    "nfkb_signal_path": "experiments/synthetic_data_nfkb_zambrano_2025-11-25_202351/nfkb_generated.csv",
+    "p53_vals_without_nfkb_path": "experiments/synthetic_data_konrath2020_no_nfkb_2025-11-25_203245/p53_generated.csv",
+    "model_name": "konrath2020",
+    "crosstalk_function_type": "sigmoid",
+    "offset_factor": 21.23976421,
+    "scaling_factor": 149.11569375,
+    "ode_solver_params": {
+        "rtol": 1e-2,
+        "atol": 1e-4,
+        "max_steps": 100000,
+        "dt0": 0.00001,
+        "stiff": false,
+        "batch_size": 41
+    },
+    "n_samples": 1000
+}

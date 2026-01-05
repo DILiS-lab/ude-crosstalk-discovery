@@ -1,0 +1,48 @@
+{
+    "action": "ude",
+    "time_start": 0.0,
+    "time_end": 19.9,
+    "time_step": 0.1,
+    "pre_equilibration_end": 71.9,
+    "nfkb_signal_path": "real_data/NCIp65TNFGamma200framesDec2025.csv",
+    "true_p53_values_path": "real_data/p53intTNFGamma200framesDec2025.csv",
+    "model_name": "hunziker2010",
+    "ode_solver_params": {
+        "rtol": 1e-2,
+        "atol": 1e-4,
+        "max_steps": 100000,
+        "dt0": 0.1,
+        "stiff": true
+    },
+    "pre_equilibration_solver_params": {
+        "rtol": 1e-2,
+        "atol": 1e-4,
+        "max_steps": 100000,
+        "dt0": 0.1,
+        "stiff": true
+    },
+    "n_epochs": 1000,
+    "learning_rate": 1e-3,
+    "batch_size": 41,
+    "init_method": "init_resample",
+    "init_args": {
+        "model_parameters": [
+            720.5,
+            0.018,
+            0.042,
+            7536,
+            1.134,
+            0.008,
+            0.428,
+            0.2,
+            0.9
+        ],
+        "initial_conditions": [
+            0,
+            60,
+            0,
+            0
+        ],
+        "change_scale": 0.1
+    }
+}
