@@ -112,6 +112,41 @@ The real-data setup, as the name suggests, contains the real p53 dynamics measur
 python train_ude_real_data.py config/your_config_file
 ```
 
+## Re-using the crosstalk factor neural network
+The neural network parameters are saved after training in the experiment folder in the file `neural_network.eqx`. To re-use the neural network, simply add the following lines of code in your Python file:
+
+```python
+import jax
+from utils.neural_networks import SynthNN
+import equinox as eqx
+
+key = jax.random.PRNGKey(0)
+neural_net = SynthNN(key)
+
+neural_net_single = eqx.tree_deserialise_leaves("Path of file neural_network.eqx", neural_net)
+neural_net = jax.vmap(lambda x: neural_net_single(x)) # handle multiple inputs
+predictions = neural_net(input.reshape(-1,1))
+```
+
+## Loading the symbolic regression externally
+
+If you have run symbolic regression, you can load the resulting function in the `load_symbolic_model_externally.py` file. Specify as input of the function the experiment folder path from which the symbolic regression is.
+
+```python
+from load_symbolic_model_externally import load_symbolic_model_externally
+
+symbolic_model = load_symbolic_model_externally(experiment_folder_path)
+symbolic_values = symbolic_model(nfkb_values)
+```
+
+## Loading the UDE externally with learned parameters
+
+If you want to load a previously trained UDE and solve it, you can use the `load_ude_model_externally.py` file. 
+Run the following command with the specific experiment path:
+
+```bash
+python load_ude_model_externally D:/User/X/your-experiment-full-path
+```
 
 ## Folder Structure
 
