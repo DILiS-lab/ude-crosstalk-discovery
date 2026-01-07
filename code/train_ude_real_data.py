@@ -176,6 +176,7 @@ eqx.tree_serialise_leaves(
 learned_model_params = unconstrained_to_ode_space(
     trained_vars["model_params"], min_p, max_p
 )
+learned_scaling_params = trained_vars["scaling_params"]
 
 
 # Calculate and print RMSE between learned and initial parameters
@@ -192,6 +193,14 @@ np.savetxt(
 )
 print(f"Learned parameters saved to {experiment_folder}/learned_parameters.csv")
 
+# Save learned scaling parameters
+learned_scaling_df = pd.DataFrame({
+    "offset": learned_scaling_params["offset"],
+    "scale": learned_scaling_params["scale"]
+})
+learned_scaling_df.to_csv(Path(experiment_folder) / "learned_scaling_parameters.csv", index=False)
+print(f"Learned scaling parameters saved to {experiment_folder}/learned_scaling_parameters.csv")
+
 print("Generating p53 predictions with trained UDE model.")
 solution = ude_solve_in_parallel(
     ude_model, time_points, max_steps, dt0, rtol, atol, stiff
@@ -202,13 +211,9 @@ solution = ude_solve_in_parallel(
     batch_size=batch_size,
 )
 
-if offset_factor is not None and scaling_factor is not None:
-    # only for the Konrath 2020 ODE
-    p53_preds = final_solution_format[model_name](
-        solution, offset_factor, scaling_factor
-    )
-else:
-    p53_preds = final_solution_format[model_name](solution)
+p53_preds = final_solution_format[model_name](
+    solution, learned_scaling_params["offset"], learned_scaling_params["scale"]
+)
 
 plot_data(
     time_points,
@@ -299,13 +304,9 @@ solution = ude_solve_in_parallel(
     symbolic_reg_model,
     batch_size=batch_size,
 )
-if offset_factor is not None and scaling_factor is not None:
-    # only for the Konrath 2020 ODE
-    p53_symbolic = final_solution_format[model_name](
-        solution, offset_factor, scaling_factor
-    )
-else:
-    p53_symbolic = final_solution_format[model_name](solution)
+p53_symbolic = final_solution_format[model_name](
+    solution, learned_scaling_params["offset"], learned_scaling_params["scale"]
+)
 
 plot_data(
     time_points,
