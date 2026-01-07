@@ -489,15 +489,17 @@ new_boundaries_p = {
 ######## FINAL SOLUTION FORMATTING FUNCTIONS #######
 
 
-def final_solution_format_hunziker(sol):
+def final_solution_format_hunziker(sol, os_=0.0, sc_=1.0):
     """
     Format final solution for Hunziker et al. model.
     Args:
         sol: Solution array with shape (time_points, samples, variables).
+        os_: Offset value (default is 0.0).
+        sc_: Scale value (default is 1.0).
     Returns:
         Formatted solution array with only p53 values.
     """
-    return sol[:, :, 0]
+    return os_ + sc_ * sol[:, :, 0]
 
 
 def final_solution_format_konrath(sol, os_=0.0, sc_=1.0):
