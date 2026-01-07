@@ -7,6 +7,8 @@
     "nfkb_signal_path": "real_data/NCIp65TNFGamma200framesDec2025.csv",
     "true_p53_values_path": "real_data/p53intTNFGamma200framesDec2025.csv",
     "model_name": "hunziker2010",
+    "offset_factor": 21.23976421,
+    "scaling_factor": 2.0,
     "ode_solver_params": {
         "rtol": 1e-2,
         "atol": 1e-4,
@@ -21,7 +23,7 @@
         "dt0": 0.1,
         "stiff": true
     },
-    "n_epochs": 1000,
+    "n_epochs": 2000,
     "learning_rate": 1e-3,
     "batch_size": 41,
     "init_method": "init_resample",
