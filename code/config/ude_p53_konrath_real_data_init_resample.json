@@ -23,7 +23,7 @@
         "dt0": 0.00001,
         "stiff": false
     },
-    "n_epochs": 1000, 
+    "n_epochs": 2000, 
     "learning_rate": 1e-3,
     "batch_size": 41,
     "init_method": "init_resample",
