@@ -153,8 +153,6 @@ def loss_fn(
     initial_conditions_batch,
     nfkb_signal_batch,
     model_name,
-    offset_factor=None,
-    scaling_factor=None,
 ):
     """
     Compute the loss for a batch of data during UDE training.
@@ -169,8 +167,6 @@ def loss_fn(
         initial_conditions_batch: Initial conditions for the current batch.
         nfkb_signal_batch: NF-κB signals for the current batch.
         model_name: Name of the model being used.
-        offset_factor: Optional offset factor for formatting the solution.
-        scaling_factor: Optional scaling factor for formatting the solution.
     Returns:
         Computed loss value for the current batch.
     """
@@ -178,6 +174,10 @@ def loss_fn(
     synth_nn = trainable_vars["nn"]
     raw_model_params = trainable_vars["model_params"]
     raw_p_batch = raw_model_params[idxs]
+
+    scaling_params = trainable_vars["scaling_params"]
+    offset_batch = scaling_params["offset"][idxs]
+    scaling_batch = scaling_params["scale"][idxs]
 
     contr_params_batch = unconstrained_to_ode_space(raw_p_batch, params_min, params_max)
 
@@ -187,13 +187,10 @@ def loss_fn(
         synth_nn,
         None,
     )
-    if offset_factor is not None and scaling_factor is not None:
-        # only for the Konrath 2020 ODE
-        p53_preds_batch = final_solution_format[model_name](
-            solution, offset_factor, scaling_factor
+
+    p53_preds_batch = final_solution_format[model_name](
+            solution, offset_batch, scaling_batch
         )
-    else:
-        p53_preds_batch = final_solution_format[model_name](solution)
 
     loss = jnp.mean(optax.huber_loss(p53_preds_batch, p53_true_batch, delta=1.0))
 
@@ -249,12 +246,12 @@ def training_step(
         initial_conditions_batch,
         nfkb_signal_batch,
         model_name,
-        offset_factor,
-        scaling_factor,
     )
+
     grads = jax.tree_util.tree_map(
         lambda g: jnp.nan_to_num(g, nan=0.0, posinf=0.0, neginf=0.0), grads
     )
+    
     updates, opt_state = optimizer.update(grads, opt_state, trainable_vars)
     trainable_vars = eqx.apply_updates(trainable_vars, updates)
 
@@ -318,7 +315,15 @@ def train_ude(
     synth_nn = SynthNN(key)
 
     params_unconstrained = ode_space_to_unconstrained(model_params, min_p, max_p)
-    trainable_vars = {"nn": synth_nn, "model_params": params_unconstrained}
+
+    scaling_params = {
+            "offset": jnp.full((n_samples,), offset_factor),
+            "scale": jnp.full((n_samples,), scaling_factor),
+        }
+
+    trainable_vars = {"nn": synth_nn, 
+                      "model_params": params_unconstrained,
+                      "scaling_params": scaling_params}
 
     solver_fn = ude_solve_in_parallel(
         ude_model, time_points, max_steps, dt0, rtol, atol, stiff_solver=stiff
