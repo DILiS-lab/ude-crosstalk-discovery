@@ -210,7 +210,7 @@ def plot_training_loss(
         show_title: If True, display the title on the plot.
     """
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(6, 4))
     ax.plot(range(1, len(losses) + 1), losses)
     if show_title:
         ax.set(title=title)
