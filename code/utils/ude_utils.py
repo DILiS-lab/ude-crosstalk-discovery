@@ -280,6 +280,7 @@ def train_ude(
     model_name,
     offset_factor=None,
     scaling_factor=None,
+    key=None,
 ):
     """
     Train a UDE model using the provided data and parameters.
@@ -305,14 +306,18 @@ def train_ude(
         model_name: Name of the model being used.
         offset_factor: Optional offset factor for formatting the solution.
         scaling_factor: Optional scaling factor for formatting the solution.
+        key: JAX PRNGKey for random number generation.
     Returns:
         A tuple containing:
             - trained_vars: Dictionary of trained variables (neural network and model parameters).
             - epoch_losses: List of average epoch losses over training.
     """
 
-    key = jax.random.PRNGKey(0)
-    synth_nn = SynthNN(key)
+    if key is None:
+        key = jax.random.PRNGKey(0)
+
+    key, nn_key = jax.random.split(key)
+    synth_nn = SynthNN(nn_key)
 
     params_unconstrained = ode_space_to_unconstrained(model_params, min_p, max_p)
 
@@ -343,7 +348,8 @@ def train_ude(
     log_handle = open(log_file, "a", buffering=1)
 
     for epoch in range(n_epochs):
-        perm = jax.random.permutation(jax.random.PRNGKey(epoch), N)
+        key, perm_key = jax.random.split(key)
+        perm = jax.random.permutation(perm_key, N)
         epoch_loss = 0.0
         num_batches = 0
 

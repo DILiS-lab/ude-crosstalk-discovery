@@ -1,5 +1,6 @@
 from pysr import PySRRegressor
 import os
+import jax
 import jax.numpy as jnp
 
 
@@ -24,18 +25,24 @@ def make_value_weights(nfkb_values, bins=20, eps=1e-6):
     return w
 
 
-def run_symbolic_regression(experiment_folder, input, predictions):
+def run_symbolic_regression(experiment_folder, input, predictions, key=None):
     """
     Run symbolic regression to find an interpretable function mapping input to predictions.
     Args:
         experiment_folder: Folder path to save the symbolic regression log.
         input: Input data array (2D).
         predictions: Target predictions array (2D).
+        key: JAX PRNGKey for symbolic regression.
     Returns:
         A tuple containing:
             - function: The symbolic regression function as a JAX callable.
             - parameters: The parameters of the symbolic regression function.
     """
+
+    if key is None:
+        seed = 0
+    else:
+        seed = int(jax.random.randint(key, (), 0, 2**32 - 1))
 
     model = PySRRegressor(
         niterations=1000,
@@ -47,6 +54,10 @@ def run_symbolic_regression(experiment_folder, input, predictions):
         progress=False,
         update=False,
         batching=True,
+        random_state=seed,
+        deterministic=True,
+        parallelism='serial'
+
     )
 
     weights = make_value_weights(input)

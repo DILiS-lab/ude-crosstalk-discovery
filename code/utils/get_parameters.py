@@ -13,6 +13,7 @@ def random_sample_parameters(
     change_scale,
     sample_initial_conditions,
     experiment_folder,
+    key,
 ):
     """
     Randomly sample model parameters and initial conditions using log-normal distribution.
@@ -23,6 +24,7 @@ def random_sample_parameters(
         change_scale: Scale of variation for sampling.
         sample_initial_conditions: Boolean indicating whether to sample initial conditions.
         experiment_folder: Folder path to save sampled parameters and initial conditions.
+        key: JAX random key for sampling.
     Returns:
         sampled_params: Array of shape (n_signals, n_params) with sampled model parameters.
         initial_conditions_: Array of shape (n_signals, n_initial_conditions) with sampled initial conditions.
@@ -32,6 +34,7 @@ def random_sample_parameters(
     sampled_params = sampled_params.at[0, :].set(model_params)
 
     for i in range(len(model_params)):
+        key, subkey = jax.random.split(key)
         param = model_params[i]
 
         # calculate mu and sigma for log-normal distribution
@@ -40,9 +43,14 @@ def random_sample_parameters(
         var_x = std_x**2
         mu = np.log((mu_x_sq) / np.sqrt(var_x + mu_x_sq))
         sigma = np.sqrt(np.log(var_x / (mu_x_sq) + 1))
-        sampled_params = sampled_params.at[1:, i].set(
-            np.random.lognormal(mean=mu, sigma=sigma, size=(n_signals - 1,))
-        )
+        
+        # approximate lognormal using jax.random.normal
+        # X ~ Lognormal(mu, sigma) <=> log(X) ~ Normal(mu, sigma)
+        # <=> X = exp(mu + sigma * Z), where Z ~ Normal(0, 1)
+        z = jax.random.normal(subkey, shape=(n_signals - 1,))
+        sampled_values = jnp.exp(mu + sigma * z)
+        
+        sampled_params = sampled_params.at[1:, i].set(sampled_values)
 
     if sample_initial_conditions:
         n_init = initial_conditions.shape[0]
@@ -53,6 +61,8 @@ def random_sample_parameters(
             cond = initial_conditions[i]
 
             if cond > 0:
+                key, subkey = jax.random.split(key)
+                
                 # calculate mu and sigma for log-normal distribution
                 mu_x_sq = cond**2
                 std_x = cond * change_scale
@@ -60,9 +70,10 @@ def random_sample_parameters(
                 mu = np.log((mu_x_sq) / np.sqrt(var_x + mu_x_sq))
                 sigma = np.sqrt(np.log(var_x / (mu_x_sq) + 1))
 
-                initial_conditions_ = initial_conditions_.at[1:, i].set(
-                    np.random.lognormal(mean=mu, sigma=sigma, size=(n_signals - 1,))
-                )
+                z = jax.random.normal(subkey, shape=(n_signals - 1,))
+                sampled_values = jnp.exp(mu + sigma * z)
+
+                initial_conditions_ = initial_conditions_.at[1:, i].set(sampled_values)
     else:
         initial_conditions_ = jnp.tile(initial_conditions, (n_signals, 1))
 
@@ -84,7 +95,12 @@ def random_sample_parameters(
 
 
 def sample_within_intervals(
-    min_params, max_params, min_initial_conditions, max_initial_conditions, n_samples
+    min_params,
+    max_params,
+    min_initial_conditions,
+    max_initial_conditions,
+    n_samples,
+    key,
 ):
     """
     Sample model parameters and initial conditions uniformly within specified intervals.
@@ -94,6 +110,7 @@ def sample_within_intervals(
         min_initial_conditions: Array of minimum values for initial conditions.
         max_initial_conditions: Array of maximum values for initial conditions.
         n_samples: Number of samples to generate.
+        key: JAX random key for sampling.
     Returns:
         sampled_params: Array of shape (n_samples, n_params) with sampled model parameters.
         sampled_initial_conditions: Array of shape (n_samples, n_initial_conditions) with sampled initial conditions.
@@ -103,10 +120,12 @@ def sample_within_intervals(
     sampled_params = jnp.zeros((n_samples, n_p))
     sampled_initial_conditions = jnp.zeros((n_samples, n_ic))
 
+    keys = jax.random.split(key, n_p + n_ic)
+
     for i in range(n_p):
         sampled_params = sampled_params.at[:, i].set(
             jax.random.uniform(
-                jax.random.PRNGKey(i),
+                keys[i],
                 shape=(n_samples,),
                 minval=min_params[i],
                 maxval=max_params[i],
@@ -116,7 +135,7 @@ def sample_within_intervals(
     for j in range(n_ic):
         sampled_initial_conditions = sampled_initial_conditions.at[:, j].set(
             jax.random.uniform(
-                jax.random.PRNGKey(j),
+                keys[n_p + j],
                 shape=(n_samples,),
                 minval=min_initial_conditions[j],
                 maxval=max_initial_conditions[j],
@@ -129,7 +148,7 @@ def sample_within_intervals(
 ##### INITIALIZATION OF PARAMETERS AND INITIAL CONDITIONS FOR UDE TRAINING #####
 
 
-def init_with_known_values(config, project_root, experiment_folder, n_samples):
+def init_with_known_values(config, project_root, experiment_folder, n_samples, key=None):
     """
     Initialize model parameters and initial conditions with known values from CSV files.
     Args:
@@ -137,6 +156,7 @@ def init_with_known_values(config, project_root, experiment_folder, n_samples):
         project_root: Root directory path for the project.
         experiment_folder: Folder path to save known parameters and initial conditions.
         n_samples: Number of samples.
+        key: JAX random key (unused here but included for consistency).
     Returns:
         model_params: Array of model parameters loaded from CSV file.
         initial_conditions: Array of initial conditions loaded from CSV file.
@@ -182,7 +202,7 @@ def init_with_known_values(config, project_root, experiment_folder, n_samples):
     return model_params, initial_conditions, min_p, max_p, min_ic, max_ic
 
 
-def init_with_resampling(config, project_root, experiment_folder, n_samples):
+def init_with_resampling(config, project_root, experiment_folder, n_samples, key):
     """
     Initialize model parameters and initial conditions by resampling around known values.
     Args:
@@ -190,6 +210,7 @@ def init_with_resampling(config, project_root, experiment_folder, n_samples):
         project_root: Root directory path for the project.
         experiment_folder: Folder path to save resampled parameters and initial conditions.
         n_samples: Number of samples to generate.
+        key: JAX random key for sampling.
     Returns:
         model_params: Array of resampled model parameters.
         initial_conditions: Array of resampled initial conditions.
@@ -210,6 +231,7 @@ def init_with_resampling(config, project_root, experiment_folder, n_samples):
         change_scale,
         True,
         experiment_folder,
+        key,
     )
 
     buffer = 0.1  # 10% buffer to prevent boundary issues
@@ -221,7 +243,7 @@ def init_with_resampling(config, project_root, experiment_folder, n_samples):
     return resampled_params, resampled_initial_conditions, min_p, max_p, min_ic, max_ic
 
 
-def init_within_intervals(config, project_root, experiment_folder, n_samples):
+def init_within_intervals(config, project_root, experiment_folder, n_samples, key):
     """
     Initialize model parameters and initial conditions by sampling uniformly within specified intervals.
     Args:
@@ -229,6 +251,7 @@ def init_within_intervals(config, project_root, experiment_folder, n_samples):
         project_root: Root directory path for the project.
         experiment_folder: Folder path to save sampled parameters and initial conditions.
         n_samples: Number of samples to generate.
+        key: JAX random key for sampling.
     Returns:
         model_params: Array of sampled model parameters.
         initial_conditions: Array of sampled initial conditions.
@@ -248,6 +271,7 @@ def init_within_intervals(config, project_root, experiment_folder, n_samples):
         min_initial_conditions,
         max_initial_conditions,
         n_samples,
+        key,
     )
 
     np.savetxt(

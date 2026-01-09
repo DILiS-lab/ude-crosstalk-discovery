@@ -95,10 +95,16 @@ n_samples = true_p53_values.shape[1]
 offset_factor = config.get("offset_factor", None)
 scaling_factor = config.get("scaling_factor", None)
 
+seed = config.get("seed", 0)
+print(f"Random seed set to: {seed}")
+np.random.seed(seed)
+master_key = jax.random.PRNGKey(seed)
+
 initialization_method, init_args = config["init_method"], config["init_args"]
+master_key, init_key = jax.random.split(master_key)
 model_params, initial_conditions, min_p, max_p, min_ic, max_ic = initialize_for_ude[
     initialization_method
-](init_args, project_root, experiment_folder, n_samples)
+](init_args, project_root, experiment_folder, n_samples, init_key)
 
 pre_equilibration = config.get("pre_equilibration_end", None)
 if pre_equilibration:
@@ -134,6 +140,7 @@ print(
 )
 
 print("Starting the training of the UDE model")
+master_key, train_key = jax.random.split(master_key)
 trained_vars, epoch_losses = train_ude(
     model_params_after_equilibration,
     min_p,
@@ -156,6 +163,7 @@ trained_vars, epoch_losses = train_ude(
     model_name,
     offset_factor,
     scaling_factor,
+    train_key,
 )
 plot_training_loss(
     epoch_losses,
@@ -215,6 +223,7 @@ p53_preds = final_solution_format[model_name](
     solution, learned_scaling_params["offset"], learned_scaling_params["scale"]
 )
 
+master_key, plot_key = jax.random.split(master_key)
 plot_data(
     time_points,
     true_p53_values,
@@ -228,6 +237,7 @@ plot_data(
     data_2=p53_preds,
     plot_random_samples=True,
     show_title=False,
+    key=plot_key,
 )
 
 # Compute and plot RMSE per time point between true and predicted p53 values
@@ -265,10 +275,13 @@ plot_data(
 )
 
 print("Running symbolic regression to extract learned crosstalk function.")
+master_key, sr_key = jax.random.split(master_key)
+
 symbolic_reg_function, s_r_params, symbolic_model = run_symbolic_regression(
     experiment_folder=experiment_folder,
     input=nfkb_flat.reshape((-1, 1)),
     predictions=pred_synth_factor.reshape((-1, 1)),
+    key=sr_key,
 )
 
 # Save the symbolic regression model
@@ -308,6 +321,7 @@ p53_symbolic = final_solution_format[model_name](
     solution, learned_scaling_params["offset"], learned_scaling_params["scale"]
 )
 
+master_key, plot_key_2 = jax.random.split(master_key)
 plot_data(
     time_points,
     true_p53_values,
@@ -322,6 +336,7 @@ plot_data(
     data_3=p53_symbolic,
     plot_random_samples=True,
     show_title=False,
+    key=plot_key_2,
 )
 
 crosstalk_symbolic = symbolic_reg_model(nfkb_flat.reshape((-1, 1)))

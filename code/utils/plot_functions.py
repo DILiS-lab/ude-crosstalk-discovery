@@ -22,6 +22,7 @@ def plot_data(
     show_markers=False,
     show_title=False,
     ylim=(0, None),
+    key=None,
 ):
     """
     Plot time series data with options for multiple datasets and random sampling.
@@ -41,6 +42,7 @@ def plot_data(
         show_markers: If True, show markers on the plot lines.
         show_title: If True, display the title on the plot.
         ylim: Tuple of (min, max) for the y-axis limits. Default is (0, None).
+        key: JAX PRNGKey for checking random samples.
     """
 
     fig, ax = plt.subplots(figsize=(6, 4))
@@ -121,7 +123,8 @@ def plot_data(
     plt.show()
 
     if plot_random_samples:
-        key = jax.random.PRNGKey(0)
+        if key is None:
+             key = jax.random.PRNGKey(0)
         random_indices = jax.random.choice(key, n_gens, shape=(4,), replace=False)
         random_data_1 = data_1[:, random_indices]
         fig, axs = plt.subplots(
