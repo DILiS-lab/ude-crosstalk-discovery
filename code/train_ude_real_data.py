@@ -260,7 +260,7 @@ plot_data(
     ["Predicted function"],
     savefig=True,
     legend=True,
-    show_markers=True,
+    show_markers=False,
     show_title=False,
 )
 
@@ -336,7 +336,7 @@ plot_data(
     savefig=True,
     legend=True,
     data_2=crosstalk_symbolic,
-    show_markers=True,
+    show_markers=False,
     show_title=False,
 )
 

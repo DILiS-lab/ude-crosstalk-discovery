@@ -21,6 +21,7 @@ def plot_data(
     plot_random_samples=False,
     show_markers=False,
     show_title=False,
+    ylim=(0, None),
 ):
     """
     Plot time series data with options for multiple datasets and random sampling.
@@ -39,9 +40,10 @@ def plot_data(
         plot_random_samples: If True, plot random samples from the datasets.
         show_markers: If True, show markers on the plot lines.
         show_title: If True, display the title on the plot.
+        ylim: Tuple of (min, max) for the y-axis limits. Default is (0, None).
     """
 
-    fig, ax = plt.subplots(figsize=(12, 8))
+    fig, ax = plt.subplots(figsize=(6, 4))
     if data_1.ndim == 1:
         data_1 = data_1.reshape(-1, 1)
     if data_2 is not None and data_2.ndim == 1:
@@ -87,6 +89,8 @@ def plot_data(
         ax.set(title=title)
     ax.set(xlabel=xlabel, ylabel=ylabel)
     ax.grid(True, alpha=0.3)
+    if ylim is not None:
+        ax.set_ylim(ylim)
 
     if legend:
         legend_elements = [
@@ -120,14 +124,16 @@ def plot_data(
         key = jax.random.PRNGKey(0)
         random_indices = jax.random.choice(key, n_gens, shape=(4,), replace=False)
         random_data_1 = data_1[:, random_indices]
-        fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(12, 8))
+        fig, axs = plt.subplots(
+            nrows=2, ncols=2, figsize=(6, 4), sharex=True, sharey=True
+        )
         plot_name = "Random Samples: " + title
         if show_title:
             fig.suptitle(plot_name, fontsize=16)
 
         colors = plt.get_cmap("tab10").colors
 
-        for i, ax in enumerate(ax.flat):
+        for i, ax in enumerate(axs.flat):
             color = colors[i % len(colors)]
             ax.plot(time_points, random_data_1[:, i], "-", color=color, **marker_kwargs)
             if data_2 is not None:
@@ -148,9 +154,12 @@ def plot_data(
                     linewidth=2,
                     **marker_kwargs,
                 )
-            ax.set(
-                title=f"Sample {random_indices[i] + 1}", xlabel=xlabel, ylabel=ylabel
-            )
+            
+            ax.set_title(f"Sample {random_indices[i] + 1}")
+            if i >= 2:
+                ax.set_xlabel(xlabel)
+            if i % 2 == 0:
+                ax.set_ylabel(ylabel)
             ax.grid(True, alpha=0.3)
 
         if legend:
@@ -186,6 +195,10 @@ def plot_data(
                 handles=legend_elements, loc="upper right", bbox_to_anchor=(0.9, 0.9)
             )
 
+        if ylim is not None:
+            for ax in axs.flat:
+                ax.set_ylim(ylim)
+
         fig.tight_layout()
         if savefig:
             plot_name = plot_name.replace(" ", "_").replace(":", "")
@@ -210,12 +223,13 @@ def plot_training_loss(
         show_title: If True, display the title on the plot.
     """
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(6, 4))
     ax.plot(range(1, len(losses) + 1), losses)
     if show_title:
         ax.set(title=title)
     ax.set(xlabel="Epochs", ylabel="Loss")
-    ax.set_yscale("log")
+    ax.set_yscale("linear")
+    ax.set_ylim(bottom=0)
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
     if savefig:
@@ -271,6 +285,7 @@ def compute_and_plot_rmse_per_timepoint(
         savefig=True,
         legend=False,
         show_title=False,
+        ylim=(0, None)
     )
 
     return rrmse_timepoint, rrmse_overall_p53
