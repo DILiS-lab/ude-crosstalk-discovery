@@ -120,7 +120,7 @@ def plot_data(
             dpi=300,
             bbox_inches="tight",
         )
-    plt.show()
+    #plt.show()
 
     if plot_random_samples:
         if key is None:
@@ -210,7 +210,7 @@ def plot_data(
                 dpi=300,
                 bbox_inches="tight",
             )
-        plt.show()
+        #plt.show()
 
 
 def plot_training_loss(
@@ -242,7 +242,7 @@ def plot_training_loss(
             dpi=300,
             bbox_inches="tight",
         )
-    plt.show()
+    #plt.show()
 
 
 def compute_and_plot_rmse_per_timepoint(

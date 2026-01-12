@@ -1,7 +1,9 @@
 import jax
 import json
 import sys
+import subprocess
 import pickle
+import matplotlib
 import jax.numpy as jnp
 import numpy as np
 import pandas as pd
@@ -43,10 +45,74 @@ config_file_path = sys.argv[1]
 with open(config_file_path, "r") as f:
     config = json.load(f)
 
-experiment_name = (
-    f"ude_{config['model_name']}_real_data_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}"
-)
-experiment_folder = Path(project_root) / "experiments" / experiment_name
+# Handle multiple seeds for uncertainty quantification
+if isinstance(config["seed"], list):
+    if len(sys.argv) == 2:  # Supervisor Mode
+        print(f"Running uncertainty experiment for seeds: {config['seed']}")
+        batch_dir_name = f"ude_{config['model_name']}_uncertainty_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}"
+        batch_dir = Path(project_root) / "experiments" / batch_dir_name
+        batch_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save batch config
+        with open(batch_dir / "config.json", "w") as f:
+            json.dump(config, f, indent=4)
+
+        processes = []
+        files_to_close = []
+
+        print(f"--- Spawning {len(config['seed'])} runs in parallel ---")
+
+        for s in config["seed"]:
+            # Pre-create run directory to capture stdout/stderr
+            run_dir = batch_dir / f"run_seed_{s}"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            
+            log_path = run_dir / "process_output.log"
+            f_log = open(log_path, "w")
+            files_to_close.append(f_log)
+            
+            print(f"Launching seed {s} -> Logs: {log_path}")
+            
+            p = subprocess.Popen(
+                [
+                    sys.executable,
+                    str(Path(__file__).resolve()),
+                    config_file_path,
+                    str(s),
+                    str(batch_dir),
+                ],
+                stdout=f_log,
+                stderr=subprocess.STDOUT,
+            )
+            processes.append(p)
+
+        # Wait for all processes to complete
+        for p in processes:
+            p.wait()
+            
+        # Close log files
+        for f in files_to_close:
+            f.close()
+
+        print(f"\nAll parallel runs completed. Results in {batch_dir}")
+        sys.exit(0)
+    elif len(sys.argv) >= 4:  # Worker Mode
+        seed_override = int(sys.argv[2])
+        parent_dir = Path(sys.argv[3])
+        config["seed"] = seed_override
+        experiment_folder = parent_dir / f"run_seed_{seed_override}"
+        # Suppress plot showing in worker mode
+        matplotlib.use("Agg")
+    else:
+        # Standard fallback if arguments are weird
+        experiment_name = f"ude_{config['model_name']}_real_data_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}"
+        experiment_folder = Path(project_root) / "experiments" / experiment_name
+else:  # Standard Mode
+    experiment_name = (
+        f"ude_{config['model_name']}_real_data_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}"
+    )
+    experiment_folder = Path(project_root) / "experiments" / experiment_name
+
 experiment_folder.mkdir(parents=True, exist_ok=True)
 print(f"Experiment folder created at: {experiment_folder}")
 
