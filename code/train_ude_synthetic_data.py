@@ -97,10 +97,16 @@ offset_factor = config.get("offset_factor", None)
 scaling_factor = config.get("scaling_factor", None)
 func_type = config["crosstalk_function_type"]
 
+seed = config["seed"]
+print(f"Random seed set to: {seed}")
+np.random.seed(seed)
+key = jax.random.PRNGKey(seed)
+init_key, train_key, plot_key, sr_key = jax.random.split(key, 4)
+
 initialization_method, init_args = config["init_method"], config["init_args"]
 model_params, initial_conditions, min_p, max_p, min_ic, max_ic = initialize_for_ude[
     initialization_method
-](init_args, project_root, experiment_folder, n_samples)
+](init_args, project_root, experiment_folder, n_samples, init_key)
 
 pre_equilibration = config.get("pre_equilibration_end", None)
 if pre_equilibration:
@@ -158,6 +164,7 @@ trained_vars, epoch_losses = train_ude(
     model_name,
     offset_factor,
     scaling_factor,
+    key=train_key,
 )
 plot_training_loss(
     epoch_losses,
@@ -224,6 +231,7 @@ plot_data(
     data_2=p53_preds,
     plot_random_samples=True,
     show_title=False,
+    key=plot_key,
 )
 
 # Compute and plot RMSE per time point between true and predicted p53 values
@@ -275,6 +283,7 @@ symbolic_reg_function, s_r_params, symbolic_model = run_symbolic_regression(
     experiment_folder=experiment_folder,
     input=nfkb_flat.reshape((-1, 1)),
     predictions=pred_synth_factor.reshape((-1, 1)),
+    key=sr_key,
 )
 
 # Save the symbolic regression model

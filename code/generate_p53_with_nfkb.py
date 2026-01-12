@@ -68,6 +68,11 @@ if n_samples == 1:
         initial_conditions, (1, initial_conditions.shape[0])
     )
 
+    seed = config["seed"]
+    print(f"Random seed set to: {seed}")
+    np.random.seed(seed)
+    key = jax.random.PRNGKey(seed)
+
 else:
     model_params = jnp.array(
         pd.read_csv(
@@ -83,6 +88,11 @@ else:
             index_col=False,
         ).values
     )
+
+    seed = config["seed"]
+    print(f"Random seed set to: {seed}")
+    np.random.seed(seed)
+    key = jax.random.PRNGKey(seed)
 
 print("Solving the ODE to generate p53 signals with NFkB")
 
@@ -143,6 +153,7 @@ plot_data(
     legend=False,
     plot_random_samples=True,
     show_title=False,
+    key=key,
 )
 plot_data(
     time_points,
@@ -157,6 +168,7 @@ plot_data(
     data_2=p53_values_with_nfkb,
     plot_random_samples=True,
     show_title=False,
+    key=key,
 )
 
 

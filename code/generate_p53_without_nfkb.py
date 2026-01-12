@@ -50,10 +50,20 @@ if n_samples == 1:
         initial_conditions, (1, initial_conditions.shape[0])
     )
 
+    seed = config["seed"]
+    print(f"Random seed set to: {seed}")
+    np.random.seed(seed)
+    key = jax.random.PRNGKey(seed)
+
 else:
     print("Sampling parameters/ initial states for multiple samples.")
     change_scale = config["change_scale"]
     sample_initial_conditions = config["sample_initial_conditions"]
+
+    seed = config["seed"]
+    print(f"Random seed set to: {seed}")
+    np.random.seed(seed)
+    key = jax.random.PRNGKey(seed)
 
     model_params, initial_conditions = random_sample_parameters(
         model_params,
@@ -62,6 +72,7 @@ else:
         change_scale,
         sample_initial_conditions,
         experiment_folder,
+        key,
     )
 
 print("Solving the ODE to generate p53 signals without NFkB")
@@ -101,7 +112,7 @@ if "offset_factor" in config and "scaling_factor" in config:
 else:
     p53_values = final_solution_format[model_name](solution)
 
-# plot the generated data
+# plot the generated generated data
 plot_data(
     time_points,
     p53_values,
@@ -114,6 +125,7 @@ plot_data(
     legend=False,
     plot_random_samples=True,
     show_title=False,
+    key=key,
 )
 
 print("Saving generated P53 values to CSV file.")

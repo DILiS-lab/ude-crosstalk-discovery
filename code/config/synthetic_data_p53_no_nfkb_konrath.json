@@ -1,5 +1,6 @@
 {
     "action": "synthetic_data_generation_no_nfkb",
+    "seed": 0,
     "time_start": 0.0,
     "time_end": 19.9,
     "time_step": 0.1,

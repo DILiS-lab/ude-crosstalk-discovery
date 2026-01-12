@@ -95,7 +95,7 @@ n_samples = true_p53_values.shape[1]
 offset_factor = config.get("offset_factor", None)
 scaling_factor = config.get("scaling_factor", None)
 
-seed = config.get("seed", 0)
+seed = config["seed"]
 print(f"Random seed set to: {seed}")
 np.random.seed(seed)
 master_key = jax.random.PRNGKey(seed)

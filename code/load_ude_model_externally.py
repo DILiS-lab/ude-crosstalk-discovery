@@ -38,8 +38,10 @@ def load_ude_model(experiment_folder):
     print(f"Loading model: {model_name}")
 
     # load the neural network
-    key = jax.random.PRNGKey(0)
-    model = SynthNN(key)
+    seed = config["seed"]
+    key = jax.random.PRNGKey(seed)
+    key, nn_key = jax.random.split(key)
+    model = SynthNN(nn_key)
 
     # load the weights
     nn_path = experiment_folder / "neural_network.eqx"

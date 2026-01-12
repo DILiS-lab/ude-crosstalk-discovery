@@ -39,6 +39,11 @@ max_steps = config["solver_max_steps"]
 
 n_signals = config["n_signals"]
 
+seed = config["seed"]
+print(f"Random seed set to: {seed}")
+np.random.seed(seed)
+key = jax.random.PRNGKey(seed)
+
 if n_signals == 1:
     model_params = jnp.broadcast_to(model_params, (1, model_params.shape[0]))
     initial_conditions = jnp.broadcast_to(
@@ -57,6 +62,7 @@ else:
         change_scale,
         sample_initial_conditions,
         experiment_folder,
+        key,
     )
 
 print("Solving the ODE to generate NFkB signal.")
