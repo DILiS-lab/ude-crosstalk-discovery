@@ -132,15 +132,17 @@ def main():
     ax_loss.set_title("Training Loss across runs (Mean & IQR)")
     ax_loss.grid(True, alpha=0.3)
     ax_loss.legend()
+    ax_loss.set_ylim(bottom=0, top=1800)
     fig_loss.tight_layout()
     fig_loss.savefig(batch_dir / "batch_loss_curve.png")
+
 
     # 2. Plot Predicted Crosstalk Function
     fig_ct, ax_ct = plt.subplots(figsize=(6, 4))
     plot_with_error_bars(ax_ct, all_crosstalk_x, all_crosstalk_y, "Learned Crosstalk", "C0", func_name='mean')
     #for cross_talk in all_crosstalk_y:
     #    ax_ct.plot(all_crosstalk_x, cross_talk, color="k", alpha=0.5, linewidth=1, ls=':')
-    ax_ct.set_ylim(bottom=0)
+    ax_ct.set_ylim(bottom=0, top=5)
     ax_ct.set_xlabel("NF-kB values")
     ax_ct.set_ylabel("Crosstalk Factor")
     ax_ct.set_title("Learned Crosstalk Function across runs (Mean & IQR)")
@@ -152,7 +154,7 @@ def main():
     # 3. Plot Relative RMSE
     fig_rmse, ax_rmse = plt.subplots(figsize=(6, 4))
     plot_with_error_bars(ax_rmse, time_points, all_rrmse, "Relative RMSE", "C0")
-    ax_rmse.set_ylim(bottom=0)
+    ax_rmse.set_ylim(bottom=0, top=1)
     ax_rmse.set_xlabel("Time [h]")
     ax_rmse.set_ylabel("Relative RMSE")
     ax_rmse.set_title("Relative RMSE per Time Point across runs (Mean & IQR)")
@@ -185,6 +187,7 @@ def main():
         if i >= 2: ax.set_xlabel("Time [h]")
         if i % 2 == 0: ax.set_ylabel("P53 Level")
         if i==1: ax.legend()
+        ax.set(ylim=(0, 4000))
 
     fig_p53.suptitle("P53 Time Series Predictions (Mean & IQR) vs True Values")
     fig_p53.tight_layout()
