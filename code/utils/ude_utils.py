@@ -281,6 +281,7 @@ def train_ude(
     offset_factor=None,
     scaling_factor=None,
     key=None,
+    nn_factory=None,
 ):
     """
     Train a UDE model using the provided data and parameters.
@@ -307,6 +308,7 @@ def train_ude(
         offset_factor: Optional offset factor for formatting the solution.
         scaling_factor: Optional scaling factor for formatting the solution.
         key: JAX PRNGKey for random number generation.
+        nn_factory: Optional factory callable to create the neural network. Defaults to SynthNN.
     Returns:
         A tuple containing:
             - trained_vars: Dictionary of trained variables (neural network and model parameters).
@@ -317,7 +319,11 @@ def train_ude(
         key = jax.random.PRNGKey(0)
 
     key, nn_key = jax.random.split(key)
-    synth_nn = SynthNN(nn_key)
+    
+    if nn_factory:
+        synth_nn = nn_factory(nn_key)
+    else:
+        synth_nn = SynthNN(nn_key)
 
     params_unconstrained = ode_space_to_unconstrained(model_params, min_p, max_p)
 

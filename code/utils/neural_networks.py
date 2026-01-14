@@ -26,3 +26,18 @@ class SynthNN(eqx.Module):
         y = self.mlp(x)
         # return 2 * jnn.sigmoid(jnp.squeeze(y))
         return jnn.softplus(jnp.squeeze(y))
+
+
+class ConstantNN(eqx.Module):
+    """
+    A Neural Network that always returns 1.0.
+    Used to simulate the 'No Crosstalk' condition within the UDE framework.
+    """
+    def __init__(self, key=None):
+        # No parameters to initialize
+        pass
+
+    def __call__(self, x):
+        # Return 1.0 regardless of input. 
+        # Since p53_synthesis = sigma * NN(nfkb), this results in p53_synthesis = sigma (constant).
+        return jnp.array(1.0)
