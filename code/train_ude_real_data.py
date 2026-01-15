@@ -201,9 +201,16 @@ np.savetxt(
     delimiter=",",
     fmt="%.6f",
 )
+
 print(
     f"Initial conditions saved to {experiment_folder}/initial_conditions_after_pre_equilibration.csv"
 )
+
+# Define initial condition bounds for training (simple buffer around current ICs)
+min_ic_train = None
+max_ic_train = None
+# We allow train_ude to default them, or we could set them here. 
+# Leaving them None uses the internal logic of train_ude (50% min, 200% max).
 
 print("Starting the training of the UDE model")
 master_key, train_key = jax.random.split(master_key)
@@ -227,9 +234,11 @@ trained_vars, epoch_losses = train_ude(
     atol,
     stiff,
     model_name,
-    offset_factor,
-    scaling_factor,
-    train_key,
+    min_ic=min_ic_train,
+    max_ic=max_ic_train,
+    offset_factor=offset_factor,
+    scaling_factor=scaling_factor,
+    key=train_key,
 )
 plot_training_loss(
     epoch_losses,
@@ -252,6 +261,22 @@ learned_model_params = unconstrained_to_ode_space(
 )
 learned_scaling_params = trained_vars["scaling_params"]
 
+# Extract learned initial conditions
+# We need to reconstruct min_ic and max_ic if we didn't pass them, to decode.
+# Since we passed None, train_ude used internal defaults.
+# We need to replicate that logic or have train_ude return the bounds used?
+# Or simpler: We just modify train_ude to return the trained variables in a state we can use? 
+# No, train_ude returns unconstrained params.
+# We need min_ic and max_ic to decode.
+# Let's set min_ic_train and max_ic_train explicitly HERE so we have them for decoding.
+min_ic_train = jnp.min(initial_conditions, axis=0) * 0.5
+current_max = jnp.max(initial_conditions, axis=0)
+max_ic_train = jnp.where(current_max == 0, 1.0, current_max * 2.0)
+max_ic_train = jnp.where(max_ic_train <= min_ic_train, min_ic_train + 1e-6, max_ic_train)
+
+learned_initial_conditions = unconstrained_to_ode_space(
+    trained_vars["initial_conditions"], min_ic_train, max_ic_train
+)
 
 # Calculate and print RMSE between learned and initial parameters
 print("Parameter Learning Results:")
@@ -267,6 +292,14 @@ np.savetxt(
 )
 print(f"Learned parameters saved to {experiment_folder}/learned_parameters.csv")
 
+np.savetxt(
+    Path(experiment_folder) / "learned_initial_conditions.csv",
+    learned_initial_conditions,
+    delimiter=",",
+    fmt="%.6f",
+)
+print(f"Learned initial conditions saved to {experiment_folder}/learned_initial_conditions.csv")
+
 # Save learned scaling parameters
 learned_scaling_df = pd.DataFrame({
     "offset": learned_scaling_params["offset"],
@@ -279,7 +312,7 @@ print("Generating p53 predictions with trained UDE model.")
 solution = ude_solve_in_parallel(
     ude_model, time_points, max_steps, dt0, rtol, atol, stiff
 )(
-    initial_conditions,
+    learned_initial_conditions,
     (learned_model_params, nfkb_signal),
     neural_net_final,
     batch_size=batch_size,
@@ -374,11 +407,12 @@ def symbolic_reg_model(x):
     return jnp.squeeze(result)
 
 
+
 print("Generating predictions with symbolic regression UDE model.")
 solution = ude_solve_in_parallel(
     ude_model, time_points, max_steps, dt0, rtol, atol, stiff
 )(
-    initial_conditions,
+    learned_initial_conditions,
     (learned_model_params, nfkb_signal),
     symbolic_reg_model,
     batch_size=batch_size,

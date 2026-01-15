@@ -137,9 +137,14 @@ np.savetxt(
     delimiter=",",
     fmt="%.6f",
 )
+
 print(
     f"Initial conditions saved to {experiment_folder}/initial_conditions_after_pre_equilibration.csv"
 )
+
+# Define initial condition bounds for training (simple buffer around current ICs)
+min_ic_train = None
+max_ic_train = None
 
 print("Starting the training of the UDE model")
 trained_vars, epoch_losses = train_ude(
@@ -162,8 +167,10 @@ trained_vars, epoch_losses = train_ude(
     atol,
     stiff,
     model_name,
-    offset_factor,
-    scaling_factor,
+    min_ic=min_ic_train,
+    max_ic=max_ic_train,
+    offset_factor=offset_factor,
+    scaling_factor=scaling_factor,
     key=train_key,
 )
 plot_training_loss(
@@ -186,6 +193,19 @@ learned_model_params = unconstrained_to_ode_space(
     trained_vars["model_params"], min_p, max_p
 )
 
+# Extract learned initial conditions
+# We need to reconstruct min_ic and max_ic if we didn't pass them, to decode.
+# Since we passed None, train_ude used internal defaults.
+min_ic_train = jnp.min(initial_conditions, axis=0) * 0.5
+current_max = jnp.max(initial_conditions, axis=0)
+max_ic_train = jnp.where(current_max == 0, 1.0, current_max * 2.0)
+max_ic_train = jnp.where(max_ic_train <= min_ic_train, min_ic_train + 1e-6, max_ic_train)
+
+learned_initial_conditions = unconstrained_to_ode_space(
+    trained_vars["initial_conditions"], min_ic_train, max_ic_train
+)
+
+
 # Calculate and print RMSE between learned and initial parameters
 print("Parameter Learning Results:")
 calculate_and_print_rmse_per_parameter(
@@ -200,11 +220,19 @@ np.savetxt(
 )
 print(f"Learned parameters saved to {experiment_folder}/learned_parameters.csv")
 
+np.savetxt(
+    Path(experiment_folder) / "learned_initial_conditions.csv",
+    learned_initial_conditions,
+    delimiter=",",
+    fmt="%.6f",
+)
+print(f"Learned initial conditions saved to {experiment_folder}/learned_initial_conditions.csv")
+
 print("Generating p53 predictions with trained UDE model.")
 solution = ude_solve_in_parallel(
     ude_model, time_points, max_steps, dt0, rtol, atol, stiff
 )(
-    initial_conditions,
+    learned_initial_conditions,
     (learned_model_params, nfkb_signal),
     neural_net_final,
     batch_size=batch_size,

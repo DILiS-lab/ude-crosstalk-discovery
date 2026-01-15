@@ -140,6 +140,7 @@ def ode_space_to_unconstrained(params, p_min, p_max):
     return jnp.log(scaled / (1 - scaled))
 
 
+
 @eqx.filter_jit
 @eqx.filter_value_and_grad
 def loss_fn(
@@ -148,9 +149,10 @@ def loss_fn(
     solver_fn,
     params_min,
     params_max,
+    ic_min,
+    ic_max,
     idxs,
     p53_true_batch,
-    initial_conditions_batch,
     nfkb_signal_batch,
     model_name,
 ):
@@ -162,9 +164,10 @@ def loss_fn(
         solver_fn: The UDE solver function.
         params_min: Minimum bounds for model parameters.
         params_max: Maximum bounds for model parameters.
+        ic_min: Minimum bounds for initial conditions.
+        ic_max: Maximum bounds for initial conditions.
         idxs: Indices of the current batch.
         p53_true_batch: True p53 values for the current batch.
-        initial_conditions_batch: Initial conditions for the current batch.
         nfkb_signal_batch: NF-κB signals for the current batch.
         model_name: Name of the model being used.
     Returns:
@@ -174,6 +177,16 @@ def loss_fn(
     synth_nn = trainable_vars["nn"]
     raw_model_params = trainable_vars["model_params"]
     raw_p_batch = raw_model_params[idxs]
+
+    # Handle trainable initial conditions
+    # If initial_conditions are in trainable_vars, use them
+    if "initial_conditions" in trainable_vars:
+        raw_ic_batch = trainable_vars["initial_conditions"][idxs]
+        initial_conditions_batch = unconstrained_to_ode_space(raw_ic_batch, ic_min, ic_max)
+    else:
+        # Fallback if not trainable (though we are making them trainable)
+        # This branch might not be reachable if we always add them
+        raise ValueError("Initial conditions expected in trainable_vars")
 
     scaling_params = trainable_vars["scaling_params"]
     offset_batch = scaling_params["offset"][idxs]
@@ -205,11 +218,12 @@ def training_step(
     opt_state,
     optimizer,
     idx_batch,
-    initial_conditions_batch,
     p53_true_batch,
     nfkb_signal_batch,
     params_min,
     params_max,
+    ic_min,
+    ic_max,
     model_name,
     offset_factor=None,
     scaling_factor=None,
@@ -223,11 +237,12 @@ def training_step(
         opt_state: Current optimizer state.
         optimizer: Optax optimizer instance.
         idx_batch: Indices of the current batch.
-        initial_conditions_batch: Initial conditions for the current batch.
         p53_true_batch: True p53 values for the current batch.
         nfkb_signal_batch: NF-κB signals for the current batch.
         params_min: Minimum bounds for model parameters.
         params_max: Maximum bounds for model parameters.
+        ic_min: Minimum bounds for initial conditions.
+        ic_max: Maximum bounds for initial conditions.
         model_name: Name of the model being used.
         offset_factor: Optional offset factor for formatting the solution.
         scaling_factor: Optional scaling factor for formatting the solution.
@@ -241,9 +256,10 @@ def training_step(
         solver_fn,
         params_min,
         params_max,
+        ic_min,
+        ic_max,
         idx_batch,
         p53_true_batch,
-        initial_conditions_batch,
         nfkb_signal_batch,
         model_name,
     )
@@ -278,6 +294,8 @@ def train_ude(
     atol,
     stiff,
     model_name,
+    min_ic=None,
+    max_ic=None, 
     offset_factor=None,
     scaling_factor=None,
     key=None,
@@ -305,6 +323,8 @@ def train_ude(
         atol: Absolute tolerance for the solver.
         stiff: Boolean indicating if a stiff solver should be used.
         model_name: Name of the model being used.
+        min_ic: Minimum bounds for initial conditions.
+        max_ic: Maximum bounds for initial conditions.
         offset_factor: Optional offset factor for formatting the solution.
         scaling_factor: Optional scaling factor for formatting the solution.
         key: JAX PRNGKey for random number generation.
@@ -324,8 +344,21 @@ def train_ude(
         synth_nn = nn_factory(nn_key)
     else:
         synth_nn = SynthNN(nn_key)
+        
+    # Setup initial condition bounds if not provided
+    if min_ic is None:
+        min_ic = jnp.min(initial_conditions, axis=0) * 0.5
+    if max_ic is None:
+        # Avoid max=min=0
+        current_max = jnp.max(initial_conditions, axis=0)
+        max_ic = jnp.where(current_max == 0, 1.0, current_max * 2.0)
+    
+    # Ensure min < max for stability in transformation
+    # Add a small buffer to max_ic where it equals min_ic
+    max_ic = jnp.where(max_ic <= min_ic, min_ic + 1e-6, max_ic)
 
     params_unconstrained = ode_space_to_unconstrained(model_params, min_p, max_p)
+    ic_unconstrained = ode_space_to_unconstrained(initial_conditions, min_ic, max_ic)
 
     scaling_params = {
             "offset": jnp.full((n_samples,), offset_factor),
@@ -334,6 +367,7 @@ def train_ude(
 
     trainable_vars = {"nn": synth_nn, 
                       "model_params": params_unconstrained,
+                      "initial_conditions": ic_unconstrained,
                       "scaling_params": scaling_params}
 
     solver_fn = ude_solve_in_parallel(
@@ -363,7 +397,7 @@ def train_ude(
             batch_end = min(i + batch_size, N)
             idx_batch = perm[i:batch_end]
 
-            initial_conditions_batch = initial_conditions[idx_batch]
+            # initial_conditions_batch = initial_conditions[idx_batch] # Removed
             true_p53_batch = true_p53_values[:, idx_batch]
             nfkb_signal_batch = nfkb_signal[:, idx_batch]
 
@@ -374,11 +408,12 @@ def train_ude(
                 opt_state,
                 optim,
                 idx_batch,
-                initial_conditions_batch,
                 true_p53_batch,
                 nfkb_signal_batch,
                 min_p,
                 max_p,
+                min_ic,
+                max_ic,
                 model_name,
                 offset_factor,
                 scaling_factor,
@@ -400,5 +435,12 @@ def train_ude(
         )
 
     log_handle.close()
-
+    
+    # Return learned initial conditions in the trainable_vars
+    # Callers might expect trainable_vars explicitly
+    # But note: earlier code did NOT have initial_conditions in trainable_vars,
+    # so we might need to handle backward compatibility or update callers' expectation?
+    # The callers just took `trained_vars` and used `trained_vars['model_params']`.
+    # We added 'initial_conditions'. This shouldn't break anything unless they iterate rigidly.
+    
     return trainable_vars, epoch_losses
