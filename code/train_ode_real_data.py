@@ -229,9 +229,9 @@ trained_vars, epoch_losses = train_ude(
     atol,
     stiff,
     model_name,
-    offset_factor,
-    scaling_factor,
-    train_key,
+    offset_factor=offset_factor,
+    scaling_factor=scaling_factor,
+    key=train_key,
     nn_factory=ConstantNN,  # Injecting our Constant NN
 )
 plot_training_loss(

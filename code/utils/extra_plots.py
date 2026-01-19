@@ -17,8 +17,8 @@ print("Real NFkB data shape:", real_nfkb_data.shape)
 fig, ax = plt.subplots(figsize=(6, 4), dpi=200)
 ax.hist(real_nfkb_data.flatten(), bins=100, edgecolor='C0',
         facecolor=to_rgba('C0', alpha=0.5),
-        histtype='stepfilled', alpha=0.5, label='Real NFkB Data', density=True)
-ax.set(title='Histogram of Real NFkB Data', xlabel='NFkB values', ylabel='Frequency')
+        histtype='stepfilled', alpha=0.5, label='Real NFkB Data', density=False)
+ax.set(title='Histogram of Real NFkB Data', xlabel='NFkB values', ylabel='Counts')
 ax.grid(True, alpha=0.3)
 fig.tight_layout()
 plt.show()
