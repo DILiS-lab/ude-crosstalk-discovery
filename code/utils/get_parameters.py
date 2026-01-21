@@ -193,7 +193,7 @@ def init_with_known_values(config, project_root, experiment_folder, n_samples, k
         fmt="%.6f",
     )
 
-    buffer = 0.1  # 10% buffer to prevent boundary issues
+    buffer = 0.9  # 90% buffer to prevent boundary issues
     min_p = jnp.min(model_params, axis=0) * (1 - buffer)
     max_p = jnp.max(model_params, axis=0) * (1 + buffer)
     min_ic = jnp.min(initial_conditions, axis=0) * (1 - buffer)
@@ -234,7 +234,7 @@ def init_with_resampling(config, project_root, experiment_folder, n_samples, key
         key,
     )
 
-    buffer = 0.1  # 10% buffer to prevent boundary issues
+    buffer = 0.9  # 90% buffer to prevent boundary issues
     min_p = jnp.min(resampled_params, axis=0) * (1 - buffer)
     max_p = jnp.max(resampled_params, axis=0) * (1 + buffer)
     min_ic = jnp.min(resampled_initial_conditions, axis=0) * (1 - buffer)
