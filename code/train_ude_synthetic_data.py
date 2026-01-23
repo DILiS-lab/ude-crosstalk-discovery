@@ -93,17 +93,17 @@ n_epochs = config["n_epochs"]
 learning_rate = config["learning_rate"]
 batch_size = config["batch_size"]
 n_samples = true_p53_values.shape[1]
-offset_factor = config.get("offset_factor", None)
-scaling_factor = config.get("scaling_factor", None)
+offset_factor = config.get("offset_factor", 0.0)
+scaling_factor = config.get("scaling_factor", 1.0)
 func_type = config["crosstalk_function_type"]
 
 seed = config["seed"]
 print(f"Random seed set to: {seed}")
 np.random.seed(seed)
-key = jax.random.PRNGKey(seed)
-init_key, train_key, plot_key, sr_key = jax.random.split(key, 4)
+master_key = jax.random.PRNGKey(seed)
 
 initialization_method, init_args = config["init_method"], config["init_args"]
+master_key, init_key = jax.random.split(master_key)
 model_params, initial_conditions, min_p, max_p, min_ic, max_ic = initialize_for_ude[
     initialization_method
 ](init_args, project_root, experiment_folder, n_samples, init_key)
@@ -147,6 +147,7 @@ min_ic_train = None
 max_ic_train = None
 
 print("Starting the training of the UDE model")
+master_key, train_key = jax.random.split(master_key)
 trained_vars, epoch_losses = train_ude(
     model_params_after_equilibration,
     min_p,
@@ -192,6 +193,7 @@ eqx.tree_serialise_leaves(
 learned_model_params = unconstrained_to_ode_space(
     trained_vars["model_params"], min_p, max_p
 )
+learned_scaling_params = trained_vars["scaling_params"]
 
 # Extract learned initial conditions
 # We need to reconstruct min_ic and max_ic if we didn't pass them, to decode.
@@ -228,6 +230,14 @@ np.savetxt(
 )
 print(f"Learned initial conditions saved to {experiment_folder}/learned_initial_conditions.csv")
 
+# Save learned scaling parameters
+learned_scaling_df = pd.DataFrame({
+    "offset": learned_scaling_params["offset"],
+    "scale": learned_scaling_params["scale"]
+})
+learned_scaling_df.to_csv(Path(experiment_folder) / "learned_scaling_parameters.csv", index=False)
+print(f"Learned scaling parameters saved to {experiment_folder}/learned_scaling_parameters.csv")
+
 print("Generating p53 predictions with trained UDE model.")
 solution = ude_solve_in_parallel(
     ude_model, time_points, max_steps, dt0, rtol, atol, stiff
@@ -238,14 +248,11 @@ solution = ude_solve_in_parallel(
     batch_size=batch_size,
 )
 
-if offset_factor is not None and scaling_factor is not None:
-    # only for the Konrath 2020 ODE
-    p53_preds = final_solution_format[model_name](
-        solution, offset_factor, scaling_factor
-    )
-else:
-    p53_preds = final_solution_format[model_name](solution)
+p53_preds = final_solution_format[model_name](
+    solution, learned_scaling_params["offset"], learned_scaling_params["scale"]
+)
 
+master_key, plot_key = jax.random.split(master_key)
 plot_data(
     time_points,
     true_p53_values,
@@ -306,7 +313,9 @@ plot_data(
     show_title=False,
 )
 
+
 print("Running symbolic regression to extract learned crosstalk function.")
+master_key, sr_key = jax.random.split(master_key)
 symbolic_reg_function, s_r_params, symbolic_model = run_symbolic_regression(
     experiment_folder=experiment_folder,
     input=nfkb_flat.reshape((-1, 1)),
@@ -323,14 +332,12 @@ print(
 
 
 def symbolic_reg_model(x):
-    """
-    Apply a symbolic regression model to input data. The function takes an input value or array, reshapes it to a 2D vector,
-    and applies a symbolic regression function with pre-computed parameters.
-    Args:
-        x: Input value or array to be processed by the symbolic regression model.
-    Returns:
-        The squeezed output of the symbolic regression
-    """
+    # Apply a symbolic regression model to input data. The function takes an input value or array, reshapes it to a 2D vector,
+    # and applies a symbolic regression function with pre-computed parameters.
+    # Args:
+    #     x: Input value or array to be processed by the symbolic regression model.
+    # Returns:
+    #     The squeezed output of the symbolic regression
 
     x_arr = jnp.asarray(x)
     x_arr = jnp.reshape(x_arr, (-1, 1))
@@ -342,18 +349,14 @@ print("Generating predictions with symbolic regression UDE model.")
 solution = ude_solve_in_parallel(
     ude_model, time_points, max_steps, dt0, rtol, atol, stiff
 )(
-    initial_conditions,
+    learned_initial_conditions,
     (learned_model_params, nfkb_signal),
     symbolic_reg_model,
     batch_size=batch_size,
 )
-if offset_factor is not None and scaling_factor is not None:
-    # only for the Konrath 2020 ODE
-    p53_symbolic = final_solution_format[model_name](
-        solution, offset_factor, scaling_factor
-    )
-else:
-    p53_symbolic = final_solution_format[model_name](solution)
+p53_symbolic = final_solution_format[model_name](
+    solution, learned_scaling_params["offset"], learned_scaling_params["scale"]
+)
 
 plot_data(
     time_points,
@@ -404,6 +407,7 @@ with open(Path(experiment_folder) / "rmse_crosstalk_values.txt", "a") as f:
     f.write(rmse_true_pred + "\n")
     f.write(rmse_true_symb + "\n")
     f.write(rmse_pred_symb + "\n")
+
 
 np.savetxt(
     Path(experiment_folder) / "p53_generated.csv", p53_preds, delimiter=",", fmt="%.6f"
