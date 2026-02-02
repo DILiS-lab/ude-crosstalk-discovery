@@ -10,6 +10,8 @@
     "model_name": "hunziker2010",
     "measurement_noise": 0.0,
     "crosstalk_function_type": "decreasing",
+    "offset_factor": 0.0,
+    "scaling_factor": 1.0,
     "ode_solver_params": {
         "rtol": 1e-2,
         "atol": 1e-4,
