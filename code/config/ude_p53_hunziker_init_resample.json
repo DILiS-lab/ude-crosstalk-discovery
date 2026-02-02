@@ -8,6 +8,7 @@
     "nfkb_signal_path": "experiments/synthetic_data_nfkb_zambrano_2025-11-25_202351/nfkb_generated.csv",
     "true_p53_values_path": "experiments/synthetic_data_hunziker2010_nfkb_2025-11-27_095621/p53_generated.csv",
     "model_name": "hunziker2010",
+    "measurement_noise": 0.0,
     "crosstalk_function_type": "decreasing",
     "ode_solver_params": {
         "rtol": 1e-2,

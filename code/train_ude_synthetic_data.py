@@ -102,6 +102,13 @@ print(f"Random seed set to: {seed}")
 np.random.seed(seed)
 master_key = jax.random.PRNGKey(seed)
 
+measurement_noise = config.get("measurement_noise", 0.0)
+if measurement_noise > 0.0:
+    print(f"Adding measurement noise with scale {measurement_noise}")
+    master_key, noise_key = jax.random.split(master_key)
+    eps = jax.random.normal(noise_key, shape=true_p53_values.shape) * measurement_noise
+    true_p53_values = true_p53_values + eps
+
 initialization_method, init_args = config["init_method"], config["init_args"]
 master_key, init_key = jax.random.split(master_key)
 model_params, initial_conditions, min_p, max_p, min_ic, max_ic = initialize_for_ude[
