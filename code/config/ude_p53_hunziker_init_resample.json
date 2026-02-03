@@ -9,7 +9,7 @@
     "true_p53_values_path": "experiments/synthetic_data_hunziker2010_nfkb_2025-11-27_095621/p53_generated.csv",
     "model_name": "hunziker2010",
     "measurement_noise": 0.0,
-    "crosstalk_function_type": "decreasing",
+    "crosstalk_function_type": "monoton_increasing_weak_hill",
     "offset_factor": 0.0,
     "scaling_factor": 1.0,
     "ode_solver_params": {
@@ -48,6 +48,6 @@
             0,
             0
         ],
-        "change_scale": 0.1
+        "change_scale": 0.25
     }
 }

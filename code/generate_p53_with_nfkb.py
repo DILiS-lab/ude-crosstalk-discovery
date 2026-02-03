@@ -28,8 +28,12 @@ config_file_path = sys.argv[1]
 with open(config_file_path, "r") as f:
     config = json.load(f)
 
-experiment_name = f"synthetic_data_{config['model_name']}_nfkb_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}"
-experiment_folder = Path(project_root) / "experiments" / experiment_name
+if "output_folder" in config:
+    experiment_folder = Path(config["output_folder"])
+else:
+    experiment_name = f"synthetic_data_{config['model_name']}_nfkb_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}"
+    experiment_folder = Path(project_root) / "experiments" / experiment_name
+
 experiment_folder.mkdir(parents=True, exist_ok=True)
 print(f"Experiment folder created at: {experiment_folder}")
 
@@ -139,6 +143,17 @@ if "offset_factor" in config and "scaling_factor" in config:
     )
 else:
     p53_values_with_nfkb = final_solution_format[model_name](solution)
+
+# Create a clean copy for plotting comparison later (optional, but good for clarity)
+p53_values_clean = p53_values_with_nfkb
+
+# Add measurement noise if specified
+measurement_noise = config.get("measurement_noise", 0.0)
+if measurement_noise > 0.0:
+    print(f"Adding measurement noise with scale {measurement_noise}")
+    key, noise_key = jax.random.split(key)
+    eps = jax.random.normal(noise_key, shape=p53_values_with_nfkb.shape) * measurement_noise
+    p53_values_with_nfkb = p53_values_with_nfkb + eps
 
 # plot the generated data
 plot_data(

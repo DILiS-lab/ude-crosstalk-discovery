@@ -2,6 +2,8 @@ import jax
 import json
 import sys
 import pickle
+import subprocess
+import matplotlib
 import jax.numpy as jnp
 import numpy as np
 import pandas as pd
@@ -44,10 +46,88 @@ config_file_path = sys.argv[1]
 with open(config_file_path, "r") as f:
     config = json.load(f)
 
-experiment_name = (
-    f"ude_{config['model_name']}_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}"
-)
-experiment_folder = Path(project_root) / "experiments" / experiment_name
+# Handle multiple seeds for uncertainty quantification
+if isinstance(config["seed"], list):
+    if len(sys.argv) == 2:  # Supervisor Mode
+        print(f"Running uncertainty experiment for seeds: {config['seed']}")
+        
+        # Determine strict output folder or default timestamp-based one
+        if "output_folder" in config:
+            base_folder = Path(config["output_folder"])
+        else:
+            base_folder = Path(project_root) / "experiments" / f"ude_{config['model_name']}_uncertainty_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}"
+            
+        base_folder.mkdir(parents=True, exist_ok=True)
+        print(f"Batch Experiment Folder: {base_folder}")
+
+        # Save batch config
+        with open(base_folder / "config.json", "w") as f:
+            json.dump(config, f, indent=4)
+
+        processes = []
+        files_to_close = []
+
+        print(f"--- Spawning {len(config['seed'])} runs in parallel ---")
+
+        for s in config["seed"]:
+            # Pre-create run directory to capture stdout/stderr
+            run_dir = base_folder / f"run_seed_{s}"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            
+            log_path = run_dir / "process_output.log"
+            f_log = open(log_path, "w")
+            files_to_close.append(f_log)
+            
+            print(f"Launching seed {s} -> Logs: {log_path}")
+            
+            # Call self with: config_path, seed_override, output_folder_override
+            p = subprocess.Popen(
+                [
+                    sys.executable,
+                    str(Path(__file__).resolve()),
+                    config_file_path,
+                    str(s),
+                    str(base_folder),
+                ],
+                stdout=f_log,
+                stderr=subprocess.STDOUT,
+            )
+            processes.append(p)
+
+        # Wait for all processes to complete
+        for p in processes:
+            p.wait()
+            
+        # Close log files
+        for f in files_to_close:
+            f.close()
+
+        print(f"\nAll parallel runs completed. Results in {base_folder}")
+        sys.exit(0)
+    elif len(sys.argv) >= 4:  # Worker Mode
+        seed_override = int(sys.argv[2])
+        parent_dir = Path(sys.argv[3])
+        config["seed"] = seed_override
+        # Create a specific subdirectory for this worker
+        experiment_folder = parent_dir / f"run_seed_{seed_override}"
+        # Suppress plot showing in worker mode
+        matplotlib.use("Agg")
+    else:
+        # Fallback if arguments are malformed (should not happen in valid flow)
+        if "output_folder" in config:
+            experiment_folder = Path(config["output_folder"])
+        else:
+            experiment_name = f"ude_{config['model_name']}_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}"
+            experiment_folder = Path(project_root) / "experiments" / experiment_name
+
+elif "output_folder" in config:
+    experiment_folder = Path(config["output_folder"])
+else:
+    experiment_name = (
+        f"ude_{config['model_name']}_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}"
+    )
+    experiment_folder = Path(project_root) / "experiments" / experiment_name
+
 experiment_folder.mkdir(parents=True, exist_ok=True)
 print(f"Experiment folder created at: {experiment_folder}")
 
@@ -321,99 +401,106 @@ plot_data(
 )
 
 
-print("Running symbolic regression to extract learned crosstalk function.")
-master_key, sr_key = jax.random.split(master_key)
-symbolic_reg_function, s_r_params, symbolic_model = run_symbolic_regression(
-    experiment_folder=experiment_folder,
-    input=nfkb_flat.reshape((-1, 1)),
-    predictions=pred_synth_factor.reshape((-1, 1)),
-    key=sr_key,
-)
-
-# Save the symbolic regression model
-with open(Path(experiment_folder) / "symbolic_regression_model.pkl", "wb") as f:
-    pickle.dump(symbolic_model, f)
-print(
-    f"Symbolic regression model saved to {experiment_folder}/symbolic_regression_model.pkl"
-)
-
-
-def symbolic_reg_model(x):
-    # Apply a symbolic regression model to input data. The function takes an input value or array, reshapes it to a 2D vector,
-    # and applies a symbolic regression function with pre-computed parameters.
-    # Args:
-    #     x: Input value or array to be processed by the symbolic regression model.
-    # Returns:
-    #     The squeezed output of the symbolic regression
-
-    x_arr = jnp.asarray(x)
-    x_arr = jnp.reshape(x_arr, (-1, 1))
-    result = symbolic_reg_function(x_arr, s_r_params)
-    return jnp.squeeze(result)
-
-
-print("Generating predictions with symbolic regression UDE model.")
-solution = ude_solve_in_parallel(
-    ude_model, time_points, max_steps, dt0, rtol, atol, stiff
-)(
-    learned_initial_conditions,
-    (learned_model_params, nfkb_signal),
-    symbolic_reg_model,
-    batch_size=batch_size,
-)
-p53_symbolic = final_solution_format[model_name](
-    solution, learned_scaling_params["offset"], learned_scaling_params["scale"]
-)
-
-plot_data(
-    time_points,
-    true_p53_values,
-    experiment_folder,
-    "True vs Predicted vs Symbolic Values of p53 levels",
-    "Time [h]",
-    "P53 level",
-    ["True values", "Predictions", "Symbolic values"],
-    savefig=True,
-    legend=True,
-    data_2=p53_preds,
-    data_3=p53_symbolic,
-    plot_random_samples=True,
-    show_title=False,
-)
-
-crosstalk_symbolic = symbolic_reg_model(nfkb_flat.reshape((-1, 1)))
-plot_data(
-    nfkb_flat,
-    true_synth_factor,
-    experiment_folder,
-    "True vs Learned vs Symbolic P53 - NF-kB Crosstalk Shape",
-    "NFkB value",
-    "Factor value",
-    ["Assumed function", "Predicted function", "Symbolic function"],
-    savefig=True,
-    legend=True,
-    data_2=pred_synth_factor,
-    data_3=crosstalk_symbolic,
-    show_markers=True,
-    show_title=False,
-)
-
-
 def rmse_func(a, b):
     return jnp.sqrt(jnp.mean((a - b) ** 2))
 
-
 rmse_true_pred = f"RMSE between true and predicted crosstalk function values: {rmse_func(true_synth_factor, pred_synth_factor):.6f}"
-rmse_true_symb = f"RMSE between true and symbolic-regression crosstalk function values: {rmse_func(true_synth_factor, crosstalk_symbolic):.6f}"
-rmse_pred_symb = f"RMSE between predicted and symbolic-regression crosstalk function values: {rmse_func(pred_synth_factor, crosstalk_symbolic):.6f}"
 print(rmse_true_pred)
-print(rmse_true_symb)
-print(rmse_pred_symb)
 
-with open(Path(experiment_folder) / "rmse_crosstalk_values.txt", "a") as f:
-    f.write(rmse_true_pred + "\n")
-    f.write(rmse_true_symb + "\n")
-    f.write(rmse_pred_symb + "\n")
+run_pySR = config.get("run_pySR", False)
+
+if run_pySR:
+    print("Running symbolic regression to extract learned crosstalk function.")
+    master_key, sr_key = jax.random.split(master_key)
+    symbolic_reg_function, s_r_params, symbolic_model = run_symbolic_regression(
+        experiment_folder=experiment_folder,
+        input=nfkb_flat.reshape((-1, 1)),
+        predictions=pred_synth_factor.reshape((-1, 1)),
+        key=sr_key,
+    )
+
+    # Save the symbolic regression model
+    with open(Path(experiment_folder) / "symbolic_regression_model.pkl", "wb") as f:
+        pickle.dump(symbolic_model, f)
+    print(
+        f"Symbolic regression model saved to {experiment_folder}/symbolic_regression_model.pkl"
+    )
+
+
+    def symbolic_reg_model(x):
+        # Apply a symbolic regression model to input data. The function takes an input value or array, reshapes it to a 2D vector,
+        # and applies a symbolic regression function with pre-computed parameters.
+        # Args:
+        #     x: Input value or array to be processed by the symbolic regression model.
+        # Returns:
+        #     The squeezed output of the symbolic regression
+
+        x_arr = jnp.asarray(x)
+        x_arr = jnp.reshape(x_arr, (-1, 1))
+        result = symbolic_reg_function(x_arr, s_r_params)
+        return jnp.squeeze(result)
+
+
+    print("Generating predictions with symbolic regression UDE model.")
+    solution = ude_solve_in_parallel(
+        ude_model, time_points, max_steps, dt0, rtol, atol, stiff
+    )(
+        learned_initial_conditions,
+        (learned_model_params, nfkb_signal),
+        symbolic_reg_model,
+        batch_size=batch_size,
+    )
+    p53_symbolic = final_solution_format[model_name](
+        solution, learned_scaling_params["offset"], learned_scaling_params["scale"]
+    )
+
+    plot_data(
+        time_points,
+        true_p53_values,
+        experiment_folder,
+        "True vs Predicted vs Symbolic Values of p53 levels",
+        "Time [h]",
+        "P53 level",
+        ["True values", "Predictions", "Symbolic values"],
+        savefig=True,
+        legend=True,
+        data_2=p53_preds,
+        data_3=p53_symbolic,
+        plot_random_samples=True,
+        show_title=False,
+    )
+
+    crosstalk_symbolic = symbolic_reg_model(nfkb_flat.reshape((-1, 1)))
+    plot_data(
+        nfkb_flat,
+        true_synth_factor,
+        experiment_folder,
+        "True vs Learned vs Symbolic P53 - NF-kB Crosstalk Shape",
+        "NFkB value",
+        "Factor value",
+        ["Assumed function", "Predicted function", "Symbolic function"],
+        savefig=True,
+        legend=True,
+        data_2=pred_synth_factor,
+        data_3=crosstalk_symbolic,
+        show_markers=True,
+        show_title=False,
+    )
+
+    rmse_true_symb = f"RMSE between true and symbolic-regression crosstalk function values: {rmse_func(true_synth_factor, crosstalk_symbolic):.6f}"
+    rmse_pred_symb = f"RMSE between predicted and symbolic-regression crosstalk function values: {rmse_func(pred_synth_factor, crosstalk_symbolic):.6f}"
+    print(rmse_true_symb)
+    print(rmse_pred_symb)
+
+    with open(Path(experiment_folder) / "rmse_crosstalk_values.txt", "a") as f:
+        f.write(rmse_true_pred + "\n")
+        f.write(rmse_true_symb + "\n")
+        f.write(rmse_pred_symb + "\n")
+
+else:
+    print("Skipping symbolic regression (run_pySR=False).")
+    with open(Path(experiment_folder) / "rmse_crosstalk_values.txt", "a") as f:
+        f.write(rmse_true_pred + "\n")
 
 
 np.savetxt(

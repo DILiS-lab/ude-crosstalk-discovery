@@ -2,14 +2,12 @@ import sys
 import json
 import jax
 import numpy as np
+import pandas as pd
 import jax.numpy as jnp
 from pathlib import Path
 from datetime import datetime
 
 from utils.plot_functions import plot_data
-from utils.get_parameters import random_sample_parameters
-from utils.models import nfkb_signal_models
-from utils.differential_equations_functions import ode_solve_in_parallel
 
 jax.config.update("jax_enable_x64", True)
 
@@ -20,8 +18,12 @@ config_file_path = sys.argv[1]
 with open(config_file_path, "r") as f:
     config = json.load(f)
 
-experiment_name = f"synthetic_data_{config['model_name']}_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}"
-experiment_folder = Path(project_root) / "experiments" / experiment_name
+if "output_folder" in config:
+    experiment_folder = Path(config["output_folder"])
+else:
+    experiment_name = f"synthetic_data_{config['model_name']}_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}"
+    experiment_folder = Path(project_root) / "experiments" / experiment_name
+
 experiment_folder.mkdir(parents=True, exist_ok=True)
 print(f"Experiment folder created at: {experiment_folder}")
 
@@ -31,11 +33,6 @@ t0 = config["time_start"]
 t1 = config["time_end"]
 dt = config["time_step"]
 time_points = jnp.arange(t0, t1 + dt, dt)
-initial_conditions = jnp.array(config["initial_conditions"])
-ode_model = nfkb_signal_models[config["model_name"]]
-model_params = jnp.array(config["model_parameters"])
-dt0 = config["solver_dt0"]
-max_steps = config["solver_max_steps"]
 
 n_signals = config["n_signals"]
 
@@ -44,35 +41,45 @@ print(f"Random seed set to: {seed}")
 np.random.seed(seed)
 key = jax.random.PRNGKey(seed)
 
-if n_signals == 1:
-    model_params = jnp.broadcast_to(model_params, (1, model_params.shape[0]))
-    initial_conditions = jnp.broadcast_to(
-        initial_conditions, (1, initial_conditions.shape[0])
-    )
+print("Mode: Augmented Real Data. Loading real signals.")
+real_data_path = Path(project_root) / config["real_data_path"]
+real_signals = pd.read_csv(real_data_path, header=None, index_col=False).values
 
-else:
-    print("Sampling parameters/initial conditions for multiple signals.")
-    change_scale = config["change_scale"]
-    sample_initial_conditions = config["sample_initial_conditions"]
+# Check dimensions
+if real_signals.shape[0] != len(time_points):
+    print(f"Warning: Real data time points ({real_signals.shape[0]}) do not match config time points ({len(time_points)}). Truncating or padding might be needed.")
+    if real_signals.shape[0] > len(time_points):
+            real_signals = real_signals[:len(time_points), :]
+    elif real_signals.shape[0] < len(time_points):
+            raise ValueError("Real data has fewer time points than requested in config.")
 
-    model_params, initial_conditions = random_sample_parameters(
-        model_params,
-        initial_conditions,
-        n_signals,
-        change_scale,
-        sample_initial_conditions,
-        experiment_folder,
-        key,
-    )
+n_real = real_signals.shape[1]
 
-print("Solving the ODE to generate NFkB signal.")
-solution = ode_solve_in_parallel(ode_model, time_points, max_steps, dt0)(
-    initial_conditions, model_params
-)
+# 1. Resample indices with replacement
+key, idx_key = jax.random.split(key)
+indices = jax.random.randint(idx_key, shape=(n_signals,), minval=0, maxval=n_real)
 
-nfkb_generated = solution[:, :, 1]
-# from the paper, the value of N is nuclear NFkB/total NFkB. We need the nuclear NFkB/cytosolic NFKB, so we convert: N/(1-N)
-nfkb_generated = nfkb_generated / (1 - nfkb_generated)
+indices_np = np.array(indices)
+selected_signals = real_signals[:, indices_np]
+
+# 2. Generate Scaling and Offset noise
+aug_scale_std = config.get("augmentation_scale_std", 0.05)
+aug_offset_std = config.get("augmentation_offset_std", 0.05)
+
+print(f"Augmentation parameters: Scale STD={aug_scale_std}, Offset STD={aug_offset_std}")
+
+key, scale_key, offset_key = jax.random.split(key, 3)
+
+# scales: shape (1, n_signals) to broadcast over time
+scales = 1.0 + jax.random.normal(scale_key, shape=(1, n_signals)) * aug_scale_std
+
+# offsets: shape (1, n_signals)
+offsets = jax.random.normal(offset_key, shape=(1, n_signals)) * aug_offset_std
+
+# 3. Apply augmentation
+nfkb_generated = selected_signals * scales + offsets
+
+print(f"Generated {n_signals} augmented signals from {n_real} real templates.")
 
 plot_data(
     time_points,
