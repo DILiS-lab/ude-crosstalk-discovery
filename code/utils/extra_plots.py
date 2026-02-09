@@ -8,7 +8,7 @@ from matplotlib.colors import to_rgba
 # Real data plots
 # ==============================================================================
 
-fig, ax = plt.subplots(2, 1, figsize=(6, 6), sharex=True, dpi=100)
+fig, ax = plt.subplots(2, 1, figsize=(6, 6), sharex=True, dpi=200)
 
 real_nfkb_data = pd.read_csv("real_data/NCIp65TNFGamma200framesDec2025.csv", header=None, index_col=False).values
 real_p53_data = pd.read_csv("real_data/p53intTNFGamma200framesDec2025.csv", header=None, index_col=False).values
@@ -19,11 +19,11 @@ print("Real p53 data shape:", real_p53_data.shape)
 ax[0].plot(ts, real_nfkb_data, alpha=0.5)
 ax[1].plot(ts, real_p53_data, alpha=0.5)
 
-ax[0].set(ylabel=r'[NF$\kappa$B]')
+ax[0].set(ylabel=r'[NF-$\kappa$B]')
 ax[1].set(xlabel='Time [h]', ylabel='[p53]')
 
 for axis in ax:
-    axis.grid(True)
+    axis.grid(True, alpha=0.2)
     axis.set(xlim=(0, 20), ylim=(0, None))
 
 fig.tight_layout()
