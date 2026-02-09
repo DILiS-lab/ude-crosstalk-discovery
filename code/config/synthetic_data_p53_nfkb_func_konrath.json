@@ -10,7 +10,7 @@
     "nfkb_signal_path": "experiments/synthetic_data_nfkb_zambrano_2026-01-12_111036/nfkb_generated.csv",
     "p53_vals_without_nfkb_path": "experiments/synthetic_data_konrath2020_no_nfkb_2026-01-12_112320/p53_generated.csv",
     "model_name": "konrath2020",
-    "crosstalk_function_type": "sigmoid",
+    "crosstalk_function_type": "monoton_increasing_weak_hill",
     "offset_factor": 21.23976421,
     "scaling_factor": 149.11569375,
     "ode_solver_params": {
@@ -21,5 +21,5 @@
         "stiff": false,
         "batch_size": 41
     },
-    "n_samples": 1000
+    "n_samples": 246
 }

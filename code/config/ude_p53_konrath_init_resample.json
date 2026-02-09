@@ -9,7 +9,7 @@
     "true_p53_values_path": "experiments/synthetic_data_konrath2020_nfkb_2025-11-27_095720/p53_generated.csv",
     "model_name": "konrath2020",
     "measurement_noise": 0.0,
-    "crosstalk_function_type": "decreasing",
+    "crosstalk_function_type": "monoton_increasing_weak_hill",
     "offset_factor": 21.23976421,
     "scaling_factor": 149.11569375,
     "ode_solver_params": {
@@ -73,6 +73,6 @@
             0,
             0
         ],
-        "change_scale": 0.1
+        "change_scale": 0.25
     }
 }

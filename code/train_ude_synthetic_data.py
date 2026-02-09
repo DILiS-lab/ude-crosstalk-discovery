@@ -186,8 +186,10 @@ measurement_noise = config.get("measurement_noise", 0.0)
 if measurement_noise > 0.0:
     print(f"Adding measurement noise with scale {measurement_noise}")
     master_key, noise_key = jax.random.split(master_key)
+    # Use Log-Normal noise for strictly positive values
+    # p53_obs = p53_true * exp(N(0, sigma))
     eps = jax.random.normal(noise_key, shape=true_p53_values.shape) * measurement_noise
-    true_p53_values = true_p53_values + eps
+    true_p53_values = true_p53_values * jnp.exp(eps)
 
 initialization_method, init_args = config["init_method"], config["init_args"]
 master_key, init_key = jax.random.split(master_key)

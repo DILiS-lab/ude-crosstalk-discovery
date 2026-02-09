@@ -5,6 +5,32 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import to_rgba
 
 # ==============================================================================
+# Real data plots
+# ==============================================================================
+
+fig, ax = plt.subplots(2, 1, figsize=(6, 6), sharex=True, dpi=100)
+
+real_nfkb_data = pd.read_csv("real_data/NCIp65TNFGamma200framesDec2025.csv", header=None, index_col=False).values
+real_p53_data = pd.read_csv("real_data/p53intTNFGamma200framesDec2025.csv", header=None, index_col=False).values
+ts = np.linspace(0, 20, 200)
+print("Real NFkB data shape:", real_nfkb_data.shape)
+print("Real p53 data shape:", real_p53_data.shape)
+
+ax[0].plot(ts, real_nfkb_data, alpha=0.5)
+ax[1].plot(ts, real_p53_data, alpha=0.5)
+
+ax[0].set(ylabel=r'[NF$\kappa$B]')
+ax[1].set(xlabel='Time [h]', ylabel='[p53]')
+
+for axis in ax:
+    axis.grid(True)
+    axis.set(xlim=(0, 20), ylim=(0, None))
+
+fig.tight_layout()
+plt.show()
+fig.savefig('plots/real_timeseries.png', bbox_inches='tight')
+
+# ==============================================================================
 # Real nfkb histogram plot
 # ==============================================================================
 
@@ -99,4 +125,3 @@ for key in synth_data_dict.keys():
         plt.show()
         fig.savefig(f'plots/synthetic_nfkb_data_histogram_change_scale_{change_scale}.png', bbox_inches='tight')         
 
-# ==============================================================================

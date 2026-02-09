@@ -20,8 +20,12 @@ def run_pipeline(master_config_path):
         model_name = temp_p53_c.get("model_name", "unknown_model")
 
     # Create Unified Experiment Directory
-    # code/experiments/synthetic/{model_name}/{timestamp}
-    experiment_base_dir = project_root / "experiments" / "synthetic" / model_name / timestamp
+    if "output_folder" in master_config:
+        experiment_base_dir = Path(master_config["output_folder"])
+    else:
+        # Default behavior: code/experiments/synthetic/{model_name}/{timestamp}
+        experiment_base_dir = project_root / "experiments" / "synthetic" / model_name / timestamp
+    
     experiment_base_dir.mkdir(parents=True, exist_ok=True)
     
     print(f"\nCreated Pipeline Directory: {experiment_base_dir}")
@@ -88,7 +92,19 @@ def run_pipeline(master_config_path):
     # To be safe and compliant with existing scripts which do `project_root / path`:
     # We must provide a path string that, when joined with project_root, points to our file.
     # So: str(nfkb_output_file.relative_to(project_root))
-    p53_config["nfkb_signal_path"] = str(nfkb_output_file.relative_to(project_root))
+
+    # Ensure absolute path for robust relative_to calculation
+    abs_nfkb_path = nfkb_output_file.resolve()
+    # If nfkb_output_file was relative, resolve might make it absolute based on CWD.
+    # If CWD is project_root, this works.
+    
+    try:
+        rel_nfkb_path = abs_nfkb_path.relative_to(project_root)
+    except ValueError:
+        # Fallback if not relative (e.g. outside project), use absolute
+        rel_nfkb_path = abs_nfkb_path
+
+    p53_config["nfkb_signal_path"] = str(rel_nfkb_path)
     
     # Overrides
     if "n_signals" in master_config:
@@ -127,8 +143,25 @@ def run_pipeline(master_config_path):
     ude_config["output_folder"] = str(experiment_base_dir)
 
     # Link inputs
-    ude_config["nfkb_signal_path"] = str(nfkb_output_file.relative_to(project_root))
-    ude_config["true_p53_values_path"] = str(p53_output_file.relative_to(project_root))
+    # Handle p53 path similarly to nfkb above
+    abs_p53_path = p53_output_file.resolve()
+    try:
+        rel_p53_path = abs_p53_path.relative_to(project_root)
+    except ValueError:
+        rel_p53_path = abs_p53_path
+
+    # We already computed rel_nfkb_path earlier, reusing logic if needed or just using the known path
+    # ideally we should re-compute or store it.
+    # But wait, nfkb_output_file hasn't changed location.
+    # Let's re-calculate absolute just to be safe in this scope
+    abs_nfkb_path = nfkb_output_file.resolve()
+    try:
+        rel_nfkb_path = abs_nfkb_path.relative_to(project_root)
+    except ValueError:
+        rel_nfkb_path = abs_nfkb_path
+
+    ude_config["nfkb_signal_path"] = str(rel_nfkb_path)
+    ude_config["true_p53_values_path"] = str(rel_p53_path)
 
     # Sync crosstalk function type from generation step to training step to ensure correct plotting
     if "crosstalk_function_type" in p53_config:

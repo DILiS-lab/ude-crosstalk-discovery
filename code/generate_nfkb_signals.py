@@ -71,14 +71,12 @@ print(f"Augmentation parameters: Scale STD={aug_scale_std}, Offset STD={aug_offs
 key, scale_key, offset_key = jax.random.split(key, 3)
 
 # scales: shape (1, n_signals) to broadcast over time
-scales = 1.0 + jax.random.normal(scale_key, shape=(1, n_signals)) * aug_scale_std
+# Using Log-Normal noise for strictly positive scaling
+# scales ~ LogNormal(0, aug_scale_std) -> Median = 1.0
+scales = jnp.exp(jax.random.normal(scale_key, shape=(1, n_signals)) * aug_scale_std)
 
-# offsets: shape (1, n_signals)
-offsets = jax.random.normal(offset_key, shape=(1, n_signals)) * aug_offset_std
-
-# 3. Apply augmentation
-nfkb_generated = selected_signals * scales + offsets
-
+# 3. Apply augmentation (Multiplicative only, to ensure positivity)
+nfkb_generated = selected_signals * scales
 print(f"Generated {n_signals} augmented signals from {n_real} real templates.")
 
 plot_data(

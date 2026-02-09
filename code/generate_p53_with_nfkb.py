@@ -151,9 +151,12 @@ p53_values_clean = p53_values_with_nfkb
 measurement_noise = config.get("measurement_noise", 0.0)
 if measurement_noise > 0.0:
     print(f"Adding measurement noise with scale {measurement_noise}")
+    # Regenerate key just in case
     key, noise_key = jax.random.split(key)
+    # Use Log-Normal noise for strictly positive values emulating multiplicative sensor noise
+    # p53_obs = p53_true * exp(N(0, sigma))
     eps = jax.random.normal(noise_key, shape=p53_values_with_nfkb.shape) * measurement_noise
-    p53_values_with_nfkb = p53_values_with_nfkb + eps
+    p53_values_with_nfkb = p53_values_with_nfkb * jnp.exp(eps)
 
 # plot the generated data
 plot_data(

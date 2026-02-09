@@ -3,12 +3,20 @@ import jax.numpy as jnp
 def monoton_increasing_hill_type(x, Kd, n, offset, scale):
     return offset + scale * (x**n) / (Kd**n + x**n)
 
+def monoton_decreasing_hill_type(x, Kd, n, offset, scale):
+    return offset + scale * (Kd**n) / (Kd**n + x**n)
+
+weak_kwargs = {'Kd': 0.8, 'n': 3.0, 'offset': 0.8, 'scale':1.5}
+strong_kwargs = {'Kd': 0.8, 'n': 3.0, 'offset': 0.8, 'scale':12.0}
+
 func = {
     "sigmoid": lambda x: 2 / (1 + jnp.exp(-x)),
     "decreasing": lambda x: 1 + 2 / (x + 1),
     "oscillatory": lambda x: jnp.abs(jnp.sin(x)),
-    "monoton_increasing_weak_hill": lambda x: monoton_increasing_hill_type(x, Kd=0.8, n=3, offset=0.8, scale=1.5),
-    "monoton_increasing_strong_hill": lambda x: monoton_increasing_hill_type(x, Kd=0.8, n=3, offset=0.8, scale=12)
+    "monoton_increasing_weak_hill": lambda x: monoton_increasing_hill_type(x, **weak_kwargs),
+    "monoton_increasing_strong_hill": lambda x: monoton_increasing_hill_type(x, **strong_kwargs),
+    "monoton_decreasing_weak_hill": lambda x: monoton_decreasing_hill_type(x, **weak_kwargs),
+    "monoton_decreasing_strong_hill": lambda x: monoton_decreasing_hill_type(x, **strong_kwargs),
 }
 
 

@@ -1,0 +1,15 @@
+{
+    "nfkb_config": "config/nfkb_signal_generation_zambrano.json",
+    "p53_config": "config/synthetic_data_p53_nfkb_func_konrath.json",
+    "ude_config": "config/ude_p53_konrath_init_resample.json",
+    "n_signals": 50,
+    "seed": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    "crosstalk_function_type": "monoton_increasing_strong_hill",
+    "nfkb_generation_mode": "augmented_real",
+    "real_data_path": "real_data/NCIp65TNFGamma200framesDec2025.csv",
+    "run_pySR": false,
+    "augmentation_scale_std": 0.1,
+    "augmentation_offset_std": 0.1,
+    "measurement_noise": 100,
+    "ude_epochs": 10
+}
