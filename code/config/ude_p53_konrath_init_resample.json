@@ -28,7 +28,7 @@
     },
     "n_epochs": 500,
     "learning_rate": 1e-3,
-    "batch_size": 41,
+    "batch_size": 16,
     "init_method": "init_resample",
     "init_args": {
         "model_parameters": [

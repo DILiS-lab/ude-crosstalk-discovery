@@ -21,22 +21,25 @@ STUDY_PARAMS = {
     
     # 2. Crosstalk Functions
     "crosstalk_functions": [
-        "monoton_increasing_weak_hill"
+        "monoton_increasing_weak_hill",
+        "monoton_decreasing_weak_hill",
+        "monoton_increasing_strong_hill",
+        "monoton_decreasing_strong_hill",
         ],
     
     # 3. Measurement Noise Levels (Sigma for Log-Normal)
     # Note: 0.1 means the observed value is multiplied by exp(N(0, 0.1)), which has a median of 1.0 and a multiplicative std dev of ~10%.
-    "noise_levels": [0, 0.1],
+    "noise_levels": [0.001, 0.01, 0.1],
     
     # 4. Number of Time Series (Signals)
     # User requested 7 but listed 6. We use the explicit collection provided.
-    "n_signals_list": [53, 61],
+    "n_signals_list": [16, 128, 512],
     
     # 5. Uncertainty Quantification Seeds
-    "seed": list(range(5)),
+    "seed": list(range(10)),
     
     # Constants
-    "epochs": 2, 
+    "epochs": 1000, 
     "run_pySR": False
 }
 
