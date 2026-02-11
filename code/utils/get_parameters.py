@@ -14,6 +14,7 @@ def random_sample_parameters(
     sample_initial_conditions,
     experiment_folder,
     key,
+    file_prefix="sampled",
 ):
     """
     Randomly sample model parameters and initial conditions using log-normal distribution.
@@ -25,6 +26,7 @@ def random_sample_parameters(
         sample_initial_conditions: Boolean indicating whether to sample initial conditions.
         experiment_folder: Folder path to save sampled parameters and initial conditions.
         key: JAX random key for sampling.
+        file_prefix: Prefix for saved files (default: "sampled").
     Returns:
         sampled_params: Array of shape (n_signals, n_params) with sampled model parameters.
         initial_conditions_: Array of shape (n_signals, n_initial_conditions) with sampled initial conditions.
@@ -79,13 +81,13 @@ def random_sample_parameters(
 
     # save sampled parameters and initial conditions
     np.savetxt(
-        os.path.join(experiment_folder, "sampled_parameters.csv"),
+        os.path.join(experiment_folder, f"{file_prefix}_parameters.csv"),
         sampled_params,
         delimiter=",",
         fmt="%.6f",
     )
     np.savetxt(
-        os.path.join(experiment_folder, "sampled_initial_conditions.csv"),
+        os.path.join(experiment_folder, f"{file_prefix}_initial_conditions.csv"),
         initial_conditions_,
         delimiter=",",
         fmt="%.6f",
@@ -232,6 +234,7 @@ def init_with_resampling(config, project_root, experiment_folder, n_samples, key
         True,
         experiment_folder,
         key,
+        file_prefix="init_resampled",
     )
 
     buffer = 0.9  # 90% buffer to prevent boundary issues

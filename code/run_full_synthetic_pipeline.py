@@ -105,6 +105,30 @@ def run_pipeline(master_config_path):
         rel_nfkb_path = abs_nfkb_path
 
     p53_config["nfkb_signal_path"] = str(rel_nfkb_path)
+
+    # Force fresh generation of parameters if n_signals > 1
+    # We load the base parameters from the 'no_nfkb' config for the respective model
+    model_name_for_params = p53_config.get("model_name")
+    if "n_signals" in master_config and master_config["n_signals"] > 1:
+        no_nfkb_config_map = {
+            "hunziker2010": "config/synthetic_data_p53_no_nfkb_hunziker.json",
+            "konrath2020": "config/synthetic_data_p53_no_nfkb_konrath.json"
+        }
+        
+        if model_name_for_params in no_nfkb_config_map:
+            try:
+                base_conf_path = project_root / no_nfkb_config_map[model_name_for_params]
+                with open(base_conf_path, "r") as bf:
+                    base_conf = json.load(bf)
+                    p53_config["model_parameters"] = base_conf["model_parameters"]
+                    p53_config["initial_conditions"] = base_conf["initial_conditions"]
+                    # Clean up file pths
+                    if "p53_vals_without_nfkb_path" in p53_config:
+                        del p53_config["p53_vals_without_nfkb_path"]
+                        
+                    print(f"Injecting base parameters from {base_conf_path} for fresh generation.")
+            except Exception as e:
+                print(f"Warning: Could not load base parameters for {model_name_for_params}: {e}")
     
     # Overrides
     if "n_signals" in master_config:
