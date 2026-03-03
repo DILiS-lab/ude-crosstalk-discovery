@@ -16,28 +16,28 @@ if str(project_root) not in sys.path:
 
 # Experiment Configuration
 EXPERIMENT_ROOT = project_root / "experiments/multivariate/multivariate_study_2026-02-10_182131"
-MODEL = "hunziker2010"
-NOISE = 0.01
-N_SIGNALS = 16
+MODELS = [("hunziker2010", "hunziker"), ("konrath2020", "konrath")]
+NOISE = 0.001
+N_SIGNALS = 512
 SEEDS = range(10)
 
-def get_experiment_dirs(root_dir):
+def get_experiment_dirs(root_dir, model):
     """Find all experiment directories matching the criteria."""
     exp_dirs = []
     if not root_dir.exists():
         print(f"Error: Directory {root_dir} not found.")
         return exp_dirs
-        
+
     for item in root_dir.iterdir():
         if item.is_dir():
             # Check if directory name matches the pattern
             # Expected pattern: {model}_{function}_{noise}_n{n_signals}
             # Note: The noise in the folder name might be formatted (e.g. 0.01)
             # We strictly check for the noise and n_signals in the folder name strings
-            
+
             # Simple check for substrings
             name = item.name
-            if not name.startswith(MODEL):
+            if not name.startswith(model):
                 continue
             
             # Check for noise (need careful checking to distinguish 0.1 from 0.01)
@@ -146,79 +146,79 @@ def load_and_process_data(exp_info):
     return common_grid, true_function_y, np.array(interpolated_preds)
 
 def main():
-    print(f"Analyzing {MODEL} with Noise={NOISE}, N={N_SIGNALS}")
-    experiments = get_experiment_dirs(EXPERIMENT_ROOT)
-    
-    if not experiments:
-        print("No matching experiments found.")
-        return
+    for MODEL, subdir in MODELS:
+        print(f"Analyzing {MODEL} with Noise={NOISE}, N={N_SIGNALS}")
+        experiments = get_experiment_dirs(EXPERIMENT_ROOT, MODEL)
 
-    # Sort experiments by function name for consistent plotting
-    experiments.sort(key=lambda x: x['function'])
-    
-    # Create the plot - Single Figure as requested
-    fig, ax = plt.subplots(figsize=(6, 4))
-    
-    # Defined colors
-    colors = ['C0', 'C1', 'C2', 'C3']
-    
-    for i, exp in enumerate(experiments):
-        func_name = exp['function']
-        print(f"Processing {func_name}...")
-        
-        grid, true_y, preds_array = load_and_process_data(exp)
-        
-        if grid is None:
-            print(f"Skipping {func_name} - No Data")
+        if not experiments:
+            print("No matching experiments found.")
             continue
-            
-        # Calculate statistics
-        mean_pred = np.mean(preds_array, axis=0)
-        p05_pred = np.percentile(preds_array, 5, axis=0)
-        p95_pred = np.percentile(preds_array, 95, axis=0)
-        
-        # Select Color
-        color = colors[i % len(colors)]
-        
-        # Clean up label name
-        # Remove 'monoton', 'hill', and underscores, then Title Case
-        label_base = func_name.replace("hunziker2010_", "") \
-                              .replace("monoton_", "") \
-                              .replace("hill", "") \
-                              .replace("_", " ") \
-                              .strip() \
-                              .title()
-        
-        # Plot True Crosstalk (Dashed)
-        ax.plot(grid, true_y, linestyle=':', color=color, linewidth=2)
-        
-        # Plot Learned Mean (Solid)
-        ax.plot(grid, mean_pred, linestyle='-', color=color, linewidth=1, label=f'{label_base}')
-        
-        # Plot Uncertainty (Shaded)
-        ax.fill_between(grid, p05_pred, p95_pred, color=color, alpha=0.2)
-        
-    ax.set_title(f"Crosstalk Discovery: {MODEL} (Noise={NOISE}, N={N_SIGNALS})")
-    ax.set_xlabel("NF-κB Level (a.u.)",)
-    ax.set_ylabel("Crosstalk Factor")
-    
-    # Legend handling
-    ax.legend(loc='best', ncol=2)
-    ax.grid(True, alpha=0.3)
-    
-    output_filename = f"multivariate_crosstalk_summary_single_plot_{MODEL}_{NOISE}_{N_SIGNALS}.png"
-    output_path = EXPERIMENT_ROOT / output_filename
-    
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300)
-    print(f"Plot saved to {output_path}")
-    
-    # Also save to current directory
-    local_output = project_root / "plots" / "multivariate" / "crosstalk" / output_filename
-    local_output.parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(local_output, dpi=300)
-    print(f"Plot also saved to {local_output}")
-    plt.show()
+
+        # Sort experiments by function name for consistent plotting
+        experiments.sort(key=lambda x: x['function'])
+
+        # Create the plot - Single Figure as requested
+        fig, ax = plt.subplots(figsize=(6, 4))
+
+        # Defined colors
+        colors = ['C0', 'C1', 'C2', 'C3']
+
+        for i, exp in enumerate(experiments):
+            func_name = exp['function']
+            print(f"Processing {func_name}...")
+
+            grid, true_y, preds_array = load_and_process_data(exp)
+
+            if grid is None:
+                print(f"Skipping {func_name} - No Data")
+                continue
+
+            # Calculate statistics
+            mean_pred = np.mean(preds_array, axis=0)
+            p05_pred = np.percentile(preds_array, 5, axis=0)
+            p95_pred = np.percentile(preds_array, 95, axis=0)
+
+            # Select Color
+            color = colors[i % len(colors)]
+
+            # Clean up label name
+            # Remove 'monoton', 'hill', and underscores, then Title Case
+            label_base = func_name.replace("monoton_", "") \
+                                  .replace("hill", "") \
+                                  .replace("_", " ") \
+                                  .strip() \
+                                  .title()
+
+            # Plot True Crosstalk (Dashed)
+            ax.plot(grid, true_y, linestyle=':', color=color, linewidth=2)
+
+            # Plot Learned Mean (Solid)
+            ax.plot(grid, mean_pred, linestyle='-', color=color, linewidth=1, label=f'{label_base}')
+
+            # Plot Uncertainty (Shaded)
+            ax.fill_between(grid, p05_pred, p95_pred, color=color, alpha=0.2)
+
+        ax.set_title(f"Crosstalk Discovery: {MODEL} (Noise={NOISE}, N={N_SIGNALS})")
+        ax.set_xlabel("NF-κB Level (a.u.)",)
+        ax.set_ylabel("Crosstalk Factor")
+
+        # Legend handling
+        ax.legend(loc='best', ncol=2)
+        ax.grid(True, alpha=0.3)
+
+        output_filename = f"multivariate_crosstalk_summary_single_plot_{MODEL}_{NOISE}_{N_SIGNALS}.png"
+        output_path = EXPERIMENT_ROOT / output_filename
+
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=300)
+        print(f"Plot saved to {output_path}")
+
+        # Also save to model-specific subdirectory
+        local_output = project_root / "plots" / "multivariate" / subdir / "crosstalk" / output_filename
+        local_output.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(local_output, dpi=300)
+        print(f"Plot also saved to {local_output}")
+        plt.close()
 
 if __name__ == "__main__":
     main()

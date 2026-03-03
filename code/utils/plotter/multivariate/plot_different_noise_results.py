@@ -16,23 +16,23 @@ if str(project_root) not in sys.path:
 
 # Experiment Configuration
 EXPERIMENT_ROOT = project_root / "experiments/multivariate/multivariate_study_2026-02-10_182131"
-MODEL = "hunziker2010"
-FUNCTION = "monoton_increasing_weak_hill"
+MODELS = [("hunziker2010", "hunziker"), ("konrath2020", "konrath")]
+FUNCTION = "monoton_decreasing_weak_hill"
 N_SIGNALS = 512
 SEEDS = range(10)
 
-def get_experiment_dirs(root_dir):
+def get_experiment_dirs(root_dir, model):
     """Find all experiment directories matching the criteria."""
     exp_dirs = []
     if not root_dir.exists():
         print(f"Error: Directory {root_dir} not found.")
         return exp_dirs
-        
+
     for item in root_dir.iterdir():
         if item.is_dir():
             # Check if directory name matches the pattern
             name = item.name
-            if not name.startswith(MODEL):
+            if not name.startswith(model):
                 continue
             
             parts = name.split('_')
@@ -136,74 +136,75 @@ def load_and_process_data(exp_info):
     return common_grid, true_function_y, np.array(interpolated_preds)
 
 def main():
-    print(f"Analyzing {MODEL} with N={N_SIGNALS}, Function={FUNCTION}")
-    experiments = get_experiment_dirs(EXPERIMENT_ROOT)
-    
-    if not experiments:
-        print("No matching experiments found.")
-        return
+    for MODEL, subdir in MODELS:
+        print(f"Analyzing {MODEL} with N={N_SIGNALS}, Function={FUNCTION}")
+        experiments = get_experiment_dirs(EXPERIMENT_ROOT, MODEL)
 
-    # Sort experiments by noise level
-    experiments.sort(key=lambda x: x['noise'])
-    
-    # Create the plot - Single Figure as requested
-    fig, ax = plt.subplots(figsize=(6, 5))
-    
-    # Defined colors
-    colors = ['C0', 'C1', 'C2', 'C3', 'C4']
-    
-    true_plotted = False
-    
-    for i, exp in enumerate(experiments):
-        noise_val = exp['noise']
-        print(f"Processing Noise={noise_val}...")
-        
-        grid, true_y, preds_array = load_and_process_data(exp)
-        
-        if grid is None:
-            print(f"Skipping Noise={noise_val} - No Data")
+        if not experiments:
+            print("No matching experiments found.")
             continue
-            
-        # Calculate statistics
-        mean_pred = np.mean(preds_array, axis=0)
-        p05_pred = np.percentile(preds_array, 5, axis=0)
-        p95_pred = np.percentile(preds_array, 95, axis=0)
-        
-        # Select Color
-        color = colors[i % len(colors)]
-        
-        # Plot True Crosstalk (Dashed) - Only once
-        if not true_plotted and true_y is not None:
-            ax.plot(grid, true_y, linestyle='--', color='k', linewidth=2, label='True Crosstalk')
-            true_plotted = True
-        
-        # Plot Learned Mean (Solid)
-        ax.plot(grid, mean_pred, linestyle='-', color=color, linewidth=2, label=f'Learned (σ={noise_val})')
-        
-        # Plot Uncertainty (Shaded)
-        ax.fill_between(grid, p05_pred, p95_pred, color=color, alpha=0.15)
-        
-    ax.set_title(f"Effect of Noise on Discovery\n({MODEL}, N={N_SIGNALS})", fontsize=12)
-    ax.set_xlabel("NF-κB Level (a.u.)", fontsize=12)
-    ax.set_ylabel("Crosstalk Factor", fontsize=12)
-    
-    # Legend handling
-    ax.legend(loc='best', fontsize=10)
-    ax.grid(True, alpha=0.3)
-    
-    output_filename = f"multivariate_noise_summary_{MODEL}_{FUNCTION}_{N_SIGNALS}.png"
-    output_path = EXPERIMENT_ROOT / output_filename
-    
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300)
-    print(f"Plot saved to {output_path}")
-    
-    # Also save to current directory
-    local_output = project_root / "plots" / "multivariate" / "noise" / output_filename
-    local_output.parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(local_output, dpi=300)
-    print(f"Plot also saved to {local_output}")
-    plt.show()
+
+        # Sort experiments by noise level
+        experiments.sort(key=lambda x: x['noise'])
+
+        # Create the plot - Single Figure as requested
+        fig, ax = plt.subplots(figsize=(6, 5))
+
+        # Defined colors
+        colors = ['C0', 'C1', 'C2', 'C3', 'C4']
+
+        true_plotted = False
+
+        for i, exp in enumerate(experiments):
+            noise_val = exp['noise']
+            print(f"Processing Noise={noise_val}...")
+
+            grid, true_y, preds_array = load_and_process_data(exp)
+
+            if grid is None:
+                print(f"Skipping Noise={noise_val} - No Data")
+                continue
+
+            # Calculate statistics
+            mean_pred = np.mean(preds_array, axis=0)
+            p05_pred = np.percentile(preds_array, 5, axis=0)
+            p95_pred = np.percentile(preds_array, 95, axis=0)
+
+            # Select Color
+            color = colors[i % len(colors)]
+
+            # Plot True Crosstalk (Dashed) - Only once
+            if not true_plotted and true_y is not None:
+                ax.plot(grid, true_y, linestyle='--', color='k', linewidth=2, label='True Crosstalk')
+                true_plotted = True
+
+            # Plot Learned Mean (Solid)
+            ax.plot(grid, mean_pred, linestyle='-', color=color, linewidth=2, label=f'Learned (σ={noise_val})')
+
+            # Plot Uncertainty (Shaded)
+            ax.fill_between(grid, p05_pred, p95_pred, color=color, alpha=0.15)
+
+        ax.set_title(f"Effect of Noise on Discovery\n({MODEL}, N={N_SIGNALS})", fontsize=12)
+        ax.set_xlabel("NF-κB Level (a.u.)", fontsize=12)
+        ax.set_ylabel("Crosstalk Factor", fontsize=12)
+
+        # Legend handling
+        ax.legend(loc='best', fontsize=10)
+        ax.grid(True, alpha=0.3)
+
+        output_filename = f"multivariate_noise_summary_{MODEL}_{FUNCTION}_{N_SIGNALS}.png"
+        output_path = EXPERIMENT_ROOT / output_filename
+
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=300)
+        print(f"Plot saved to {output_path}")
+
+        # Also save to model-specific subdirectory
+        local_output = project_root / "plots" / "multivariate" / subdir / "noise" / output_filename
+        local_output.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(local_output, dpi=300)
+        print(f"Plot also saved to {local_output}")
+        plt.close()
 
 if __name__ == "__main__":
     main()

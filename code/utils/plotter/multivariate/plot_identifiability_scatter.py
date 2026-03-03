@@ -14,20 +14,20 @@ if str(project_root) not in sys.path:
 
 # Experiment Configuration
 EXPERIMENT_ROOT = project_root / "experiments/multivariate/multivariate_study_2026-02-10_182131"
-MODEL = "hunziker2010"
+MODELS = [("hunziker2010", "hunziker"), ("konrath2020", "konrath")]
 SEEDS = range(10)
 
-def get_experiment_dirs(root_dir):
+def get_experiment_dirs(root_dir, model):
     """Find all experiment directories matching the criteria."""
     exp_dirs = []
     if not root_dir.exists():
         print(f"Error: Directory {root_dir} not found.")
         return exp_dirs
-        
+
     for item in root_dir.iterdir():
         if item.is_dir():
             name = item.name
-            if not name.startswith(MODEL):
+            if not name.startswith(model):
                 continue
             
             parts = name.split('_')
@@ -84,111 +84,106 @@ def get_seed_metrics(exp_info):
     return seed_metrics
 
 def main():
-    print(f"Generating Identifiability Plot (Fig 3) for {MODEL}...")
-    experiments = get_experiment_dirs(EXPERIMENT_ROOT)
-    
-    if not experiments:
-        print("No matching experiments found.")
-        return
+    for MODEL, subdir in MODELS:
+        print(f"Generating Identifiability Plot (Fig 3) for {MODEL}...")
+        experiments = get_experiment_dirs(EXPERIMENT_ROOT, MODEL)
 
-    all_data = []
-    
-    print(f"Processing {len(experiments)} experiments...")
-    for i, exp in enumerate(experiments):
-        metrics = get_seed_metrics(exp)
-        for m in metrics:
-            all_data.append({
-                "n_signals": exp['n_signals'],
-                "noise": exp['noise'],
-                "function": exp['function'],
-                "trajectory_rmse": m['trajectory_rmse'],
-                "crosstalk_mae": m['crosstalk_mae']
-            })
-            
-    df = pd.DataFrame(all_data)
-    
-    if df.empty:
-        print("No data collected.")
-        return
+        if not experiments:
+            print("No matching experiments found.")
+            continue
 
-    # Filter standard setup (optional, but let's plot all valid ones)
-    valid_n = [16, 128, 512]
-    valid_noise = [0.001, 0.01, 0.1]
-    df = df[df['n_signals'].isin(valid_n) & df['noise'].isin(valid_noise)]
+        all_data = []
 
-    # --- Plotting ---
-    fig, axes = plt.subplots(1, 3, figsize=(9, 4), sharey=True, sharex=True)
-    
-    # Colors for noise levels
-    unique_noises = sorted(df['noise'].unique())
-    colors = ['C0', 'C1', 'C2'] # Matches previous plots if 3 levels
-    
-    # Check if we have more noise levels than colors
-    if len(unique_noises) > len(colors):
-        # Fallback to colormap
-        cmap = plt.get_cmap('viridis')
-        normalize = plt.Normalize(vmin=min(unique_noises), vmax=max(unique_noises))
-        color_map = {n: cmap(normalize(n)) for n in unique_noises}
-    else:
-        color_map = {n: c for n, c in zip(unique_noises, colors)}
-        
-    for i, n_val in enumerate(valid_n):
-        ax = axes[i]
-        df_n = df[df['n_signals'] == n_val]
-        
-        for noise in unique_noises:
-            subset = df_n[df_n['noise'] == noise]
-            if subset.empty: 
-                continue
-            
-            ax.scatter(subset['trajectory_rmse'], subset['crosstalk_mae'], 
-                       c=color_map[noise], 
-                       label=f"σ={noise}",
-                       alpha=0.6, 
-                       edgecolors='none',
-                       s=30)
-            
-        ax.set_title(f"N = {n_val}")
-        ax.set_xlabel("Trajectory Fit (RMSE)")
-        if i == 0:
-            ax.set_ylabel("Mechanism Recovery (Crosstalk MAE)")
-            
-        ax.set_aspect('equal', 'box')
-        
-        # Log scales usually help here as errors span orders of magnitude
-        ax.set_xscale('log')
-        ax.set_yscale('log')
-        
-        # Add 1:1 diagonal reference line
-        # We need to set limits first or get them, maybe uniform limits across all plots?
-        # But autoscaling is probably fine per plot
-        
-        xlim = ax.get_xlim()
-        ylim = ax.get_ylim()
-        
-        min_val = min(xlim[0], ylim[0])
-        max_val = max(xlim[1], ylim[1])
-        
-        ax.plot([min_val, max_val], [min_val, max_val], 'k--', alpha=0.3, zorder=0, label="1:1" if i==2 else "")
-        
-        # Reset limits to what they were (or slightly adjusted for aspect)
-        # Using aspect='equal' might force changes. 
-        # Ideally we want square plots.
-        
-        ax.grid(True, which="both", ls="-", alpha=0.2)
-        
-        if i == 0:
-            ax.legend(title="Noise Level", loc='best')
-            
-    plt.suptitle(f"Identifiability Check: Trajectory Fit vs. Mechanism Discovery ({MODEL})")
-    
-    output_filename = f"multivariate_identifiability_scatter_{MODEL}_all_N.png"
-    local_output = project_root / "plots" / "multivariate" / output_filename
-    local_output.parent.mkdir(parents=True, exist_ok=True)
-    
-    plt.tight_layout()
-    plt.savefig(local_output, dpi=300)
-    print(f"Plot saved to {local_output}")
+        print(f"Processing {len(experiments)} experiments...")
+        for i, exp in enumerate(experiments):
+            metrics = get_seed_metrics(exp)
+            for m in metrics:
+                all_data.append({
+                    "n_signals": exp['n_signals'],
+                    "noise": exp['noise'],
+                    "function": exp['function'],
+                    "trajectory_rmse": m['trajectory_rmse'],
+                    "crosstalk_mae": m['crosstalk_mae']
+                })
+
+        df = pd.DataFrame(all_data)
+
+        if df.empty:
+            print("No data collected.")
+            continue
+
+        # Filter standard setup (optional, but let's plot all valid ones)
+        valid_n = [16, 128, 512]
+        valid_noise = [0.001, 0.01, 0.1]
+        df = df[df['n_signals'].isin(valid_n) & df['noise'].isin(valid_noise)]
+
+        # --- Plotting ---
+        fig, axes = plt.subplots(1, 3, figsize=(9, 4), sharey=True, sharex=True)
+
+        # Colors for noise levels
+        unique_noises = sorted(df['noise'].unique())
+        colors = ['C0', 'C1', 'C2'] # Matches previous plots if 3 levels
+
+        # Check if we have more noise levels than colors
+        if len(unique_noises) > len(colors):
+            # Fallback to colormap
+            cmap = plt.get_cmap('viridis')
+            normalize = plt.Normalize(vmin=min(unique_noises), vmax=max(unique_noises))
+            color_map = {n: cmap(normalize(n)) for n in unique_noises}
+        else:
+            color_map = {n: c for n, c in zip(unique_noises, colors)}
+
+        for i, n_val in enumerate(valid_n):
+            ax = axes[i]
+            df_n = df[df['n_signals'] == n_val]
+
+            for noise in unique_noises:
+                subset = df_n[df_n['noise'] == noise]
+                if subset.empty:
+                    continue
+
+                ax.scatter(subset['trajectory_rmse'], subset['crosstalk_mae'],
+                           c=color_map[noise],
+                           label=f"σ={noise}",
+                           alpha=0.6,
+                           edgecolors='none',
+                           s=30)
+
+            ax.set_title(f"N = {n_val}")
+            ax.set_xlabel("Trajectory Fit (RMSE)")
+            if i == 0:
+                ax.set_ylabel("Mechanism Recovery (Crosstalk MAE)")
+
+            ax.set_aspect('equal', 'box')
+
+            # Log scales usually help here as errors span orders of magnitude
+            ax.set_xscale('log')
+            ax.set_yscale('log')
+
+            # Add 1:1 diagonal reference line
+            xlim = ax.get_xlim()
+            ylim = ax.get_ylim()
+
+            min_val = min(xlim[0], ylim[0])
+            max_val = max(xlim[1], ylim[1])
+
+            ax.plot([min_val, max_val], [min_val, max_val], 'k--', alpha=0.3, zorder=0, label="1:1" if i==2 else "")
+
+            ax.grid(True, which="both", ls="-", alpha=0.2)
+
+            if i == 0:
+                ax.legend(title="Noise Level", loc='best')
+
+        plt.suptitle(f"Identifiability Check: Trajectory Fit vs. Mechanism Discovery ({MODEL})")
+
+        output_filename = f"multivariate_identifiability_scatter_{MODEL}_all_N.png"
+        local_output = project_root / "plots" / "multivariate" / subdir / output_filename
+        local_output.parent.mkdir(parents=True, exist_ok=True)
+
+        plt.tight_layout()
+        plt.savefig(local_output, dpi=300)
+        print(f"Plot saved to {local_output}")
+        plt.close()
 
 if __name__ == "__main__":
     main()

@@ -16,23 +16,23 @@ if str(project_root) not in sys.path:
 
 # Experiment Configuration
 EXPERIMENT_ROOT = project_root / "experiments/multivariate/multivariate_study_2026-02-10_182131"
-MODEL = "hunziker2010"
-NOISE = 0.01
-FUNCTION = "monoton_decreasing_strong_hill"
+MODELS = [("hunziker2010", "hunziker"), ("konrath2020", "konrath")]
+NOISE = 0.001
+FUNCTION = "monoton_increasing_strong_hill"
 SEEDS = range(10)
 
-def get_experiment_dirs(root_dir):
+def get_experiment_dirs(root_dir, model):
     """Find all experiment directories matching the criteria."""
     exp_dirs = []
     if not root_dir.exists():
         print(f"Error: Directory {root_dir} not found.")
         return exp_dirs
-        
+
     for item in root_dir.iterdir():
         if item.is_dir():
             # Check if directory name matches the pattern
             name = item.name
-            if not name.startswith(MODEL):
+            if not name.startswith(model):
                 continue
             
             parts = name.split('_')
@@ -136,70 +136,71 @@ def load_and_process_data(exp_info):
     return common_grid, true_function_y, np.array(interpolated_preds)
 
 def main():
-    print(f"Analyzing {MODEL} with Noise={NOISE}, Function={FUNCTION}")
-    experiments = get_experiment_dirs(EXPERIMENT_ROOT)
-    
-    if not experiments:
-        print("No matching experiments found.")
-        return
+    for MODEL, subdir in MODELS:
+        print(f"Analyzing {MODEL} with Noise={NOISE}, Function={FUNCTION}")
+        experiments = get_experiment_dirs(EXPERIMENT_ROOT, MODEL)
 
-    # Sort experiments by N signals
-    experiments.sort(key=lambda x: x['n_signals'])
-    
-    # Create the plot - Single Figure
-    fig, ax = plt.subplots(figsize=(6, 5))
-    
-    colors = ['C0', 'C1', 'C2', 'C3', 'C4']
-    
-    true_plotted = False
-    
-    for i, exp in enumerate(experiments):
-        n_sig = exp['n_signals']
-        print(f"Processing N={n_sig}...")
-        
-        grid, true_y, preds_array = load_and_process_data(exp)
-        
-        if grid is None:
-            print(f"Skipping N={n_sig} - No Data")
+        if not experiments:
+            print("No matching experiments found.")
             continue
-            
-        # Calculate statistics
-        mean_pred = np.mean(preds_array, axis=0)
-        p05_pred = np.percentile(preds_array, 5, axis=0)
-        p95_pred = np.percentile(preds_array, 95, axis=0)
-        
-        color = colors[i % len(colors)]
-        
-        # Plot True Crosstalk (Only once)
-        if not true_plotted and true_y is not None:
-            ax.plot(grid, true_y, linestyle='--', color='k', linewidth=2, label=f'True Crosstalk')
-            true_plotted = True
-        
-        # Plot Learned Mean
-        ax.plot(grid, mean_pred, linestyle='-', color=color, linewidth=2, label=f'Learned (N={n_sig})')
-        
-        # Plot Uncertainty
-        ax.fill_between(grid, p05_pred, p95_pred, color=color, alpha=0.15)
-        
-    ax.set_title(f"Effect of Training Set Size on Discovery\n({MODEL}, Noise={NOISE}, {FUNCTION})", fontsize=12)
-    ax.set_xlabel("NF-κB Level (a.u.)", fontsize=12)
-    ax.set_ylabel("Crosstalk Factor", fontsize=12)
-    
-    ax.legend(loc='best', fontsize=10)
-    ax.grid(True, alpha=0.3)
-    
-    output_filename = f"timeseries_study_summary_{MODEL}_{FUNCTION}_{NOISE}.png"
-    output_path = EXPERIMENT_ROOT / output_filename
-    
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300)
-    print(f"Plot saved to {output_path}")
-    
-    local_output = project_root / "plots" / "multivariate" / "num_timeseries" / output_filename
-    local_output.parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(local_output, dpi=300)
-    print(f"Plot also saved to {local_output}")
-    plt.show()
+
+        # Sort experiments by N signals
+        experiments.sort(key=lambda x: x['n_signals'])
+
+        # Create the plot - Single Figure
+        fig, ax = plt.subplots(figsize=(6, 5))
+
+        colors = ['C0', 'C1', 'C2', 'C3', 'C4']
+
+        true_plotted = False
+
+        for i, exp in enumerate(experiments):
+            n_sig = exp['n_signals']
+            print(f"Processing N={n_sig}...")
+
+            grid, true_y, preds_array = load_and_process_data(exp)
+
+            if grid is None:
+                print(f"Skipping N={n_sig} - No Data")
+                continue
+
+            # Calculate statistics
+            mean_pred = np.mean(preds_array, axis=0)
+            p05_pred = np.percentile(preds_array, 5, axis=0)
+            p95_pred = np.percentile(preds_array, 95, axis=0)
+
+            color = colors[i % len(colors)]
+
+            # Plot True Crosstalk (Only once)
+            if not true_plotted and true_y is not None:
+                ax.plot(grid, true_y, linestyle='--', color='k', linewidth=2, label=f'True Crosstalk')
+                true_plotted = True
+
+            # Plot Learned Mean
+            ax.plot(grid, mean_pred, linestyle='-', color=color, linewidth=2, label=f'Learned (N={n_sig})')
+
+            # Plot Uncertainty
+            ax.fill_between(grid, p05_pred, p95_pred, color=color, alpha=0.15)
+
+        ax.set_title(f"Effect of Training Set Size on Discovery\n({MODEL}, Noise={NOISE}, {FUNCTION})", fontsize=12)
+        ax.set_xlabel("NF-κB Level (a.u.)", fontsize=12)
+        ax.set_ylabel("Crosstalk Factor", fontsize=12)
+
+        ax.legend(loc='best', fontsize=10)
+        ax.grid(True, alpha=0.3)
+
+        output_filename = f"timeseries_study_summary_{MODEL}_{FUNCTION}_{NOISE}.png"
+        output_path = EXPERIMENT_ROOT / output_filename
+
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=300)
+        print(f"Plot saved to {output_path}")
+
+        local_output = project_root / "plots" / "multivariate" / subdir / "num_timeseries" / output_filename
+        local_output.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(local_output, dpi=300)
+        print(f"Plot also saved to {local_output}")
+        plt.close()
 
 if __name__ == "__main__":
     main()
