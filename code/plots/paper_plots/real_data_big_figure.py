@@ -40,6 +40,20 @@ SR_FUNCS = {
                  lambda x: (x + 0.076078266) * x + 1.6450808),
 }
 
+# Hill-form symbolic regression results
+# Konrath: f(x) = x  →  offset + scale * x^n / (Kd^n + x^n)
+# Hunziker: f(x) = x² →  offset + scale * (x²)^n / (Kd^n + (x²)^n)
+SR_HILL_FUNCS = {
+    "konrath": (
+        r"$1.68 + 2.04\,\frac{x^{1.77}}{0.99^{1.77}+x^{1.77}}$",
+        lambda x: 1.676529 + 2.035762 * x**1.773329 / (0.996679**1.773329 + x**1.773329),
+    ),
+    "hunziker": (
+        r"$0.76 + 0.29\,\frac{(x^2)^{1.52}}{0.44^{1.52}+(x^2)^{1.52}}$",
+        lambda x: 0.764203 + 0.289357 * (x**2)**1.515626 / (0.440040**1.515626 + (x**2)**1.515626),
+    ),
+}
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -138,6 +152,7 @@ for dataset, ax in zip(DATASETS_BY_ROW, [ax_rmse_konrath, ax_rmse_hunziker]):
                   color=color, ls=MODEL_LS[model], label=model)
 
     ax.set_xlim(0, 20)
+    ax.set_ylim(0, 1)
     ax.set_ylabel("Relative MAE")
     #ax.set_ylim(bottom=0, top=1)
     ax.grid(True, **grid_keywords)
@@ -202,6 +217,10 @@ for dataset in ["hunziker", "konrath"]:
     sr_label, sr_fn = SR_FUNCS[dataset]
     ax_crosstalk.plot(x_grid, sr_fn(x_grid),
                       color=color, ls="--", lw=1, label=sr_label)
+
+    sr_hill_label, sr_hill_fn = SR_HILL_FUNCS[dataset]
+    ax_crosstalk.plot(x_grid, sr_hill_fn(x_grid),
+                      color=color, ls=":", lw=1, label=sr_hill_label)
 
 ax_crosstalk.set_xlabel(r"NF-$\kappa$B")
 ax_crosstalk.set_ylabel("Crosstalk factor")
