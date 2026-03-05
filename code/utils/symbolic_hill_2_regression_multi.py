@@ -45,10 +45,8 @@ def load_and_aggregate_data(experiment_dir, n_points=1000):
         
         valid_runs.append(df)
     
-    #start_x = df["nfkb_flat"].min()
-    #end_x = df["nfkb_flat"].max()
-    start_x = max(df["nfkb_flat"].min() for df in valid_runs)
-    end_x = min(df["nfkb_flat"].max() for df in valid_runs)
+    start_x = df["nfkb_flat"].min()
+    end_x = df["nfkb_flat"].max()
 
     print(f"Interpolating on range [{start_x}, {end_x}] with {n_points} points.")
     
@@ -87,15 +85,15 @@ def run_symbolic_regression_multi(experiment_dir):
     # PySR Configuration based on user prompt
     
     model = PySRRegressor(
-        niterations=50,
-        binary_operators=["+", "*", "-", "/", "pow"],
+        niterations=500,
+        binary_operators=["+", "*", "-", "/"],
         unary_operators=[],
-        complexity_of_operators={"/": 1, "+": 1, "*": 1, "-": 1, "pow": 3},
-        nested_constraints={},
-        parsimony=1, # Increased parsimony to favor simpler models
+        complexity_of_operators={"/": 2, "+": 1, "*": 1, "-": 1},
+        nested_constraints={"/": {"/": 0}},
+        parsimony=1.0, # Increased parsimony to favor simpler models
         
-        maxsize=7, # Restrict size to prevent overfitting with high-degree polynomials
-        model_selection="score",
+        maxsize=8, # Restrict size to prevent overfitting with high-degree polynomials
+        model_selection="best",
         temp_equation_file=True,
         verbosity=1,
         progress=True,
@@ -113,7 +111,7 @@ def run_symbolic_regression_multi(experiment_dir):
     print("="*50 + "\n")
     
     # Save results
-    output_log = os.path.join(experiment_dir, "symbolic_new_regression_multi_results.txt")
+    output_log = os.path.join(experiment_dir, "symbolic_regression_multi_results.txt")
     with open(output_log, "w") as f:
         f.write(f"Experiment: {experiment_dir}\n")
         f.write(f"Best equation: {best_equation['equation']}\n")
@@ -153,7 +151,7 @@ def run_symbolic_regression_multi(experiment_dir):
     plt.ylim(bottom=0, top=5)
     plt.tight_layout()
     
-    plot_file = os.path.join(experiment_dir, "symbolic_new_regression_multi_plot.png")
+    plot_file = os.path.join(experiment_dir, "symbolic_regression_multi_plot.png")
     plt.savefig(plot_file, dpi=300)
     print(f"Plot saved to {plot_file}")
 
