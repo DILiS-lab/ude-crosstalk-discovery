@@ -84,12 +84,13 @@ def load_crosstalk(exp_dir: Path, n_grid: int = 500):
     return x_grid, ys
 
 
-def plot_band(ax, x, data, color, ls, label, alpha=0.20):
+def plot_band(ax, x, data, color, ls, label, alpha=0.20, zorder=None):
     mean = data.mean(axis=0)
     lo   = np.percentile(data, 5,  axis=0)
     hi   = np.percentile(data, 95, axis=0)
-    ax.plot(x, mean, color=color, ls=ls, lw=1, label=label)
-    ax.fill_between(x, lo, hi, color=color, alpha=alpha)
+    kw = {} if zorder is None else {"zorder": zorder}
+    ax.plot(x, mean, color=color, ls=ls, lw=1, label=label, **kw)
+    ax.fill_between(x, lo, hi, color=color, alpha=alpha, **kw)
 
 # ---------------------------------------------------------------------------
 # Layout parameters
@@ -173,14 +174,16 @@ for panel_idx, sample_idx in enumerate(SAMPLE_INDICES):
     ax.plot(TIME_POINTS, true_p53[:, sample_idx] / 1000,
             color="k", lw=0.8, alpha=0.7, label="Data")
 
-    for dataset in ["hunziker", "konrath"]:
+    for dataset in ["konrath", "hunziker"]:
         data = ude_p53[dataset]
         if data is None:
             continue
         cell = data[:, :, sample_idx] / 1000
         n_tp = cell.shape[1]
+        zorder = 3 if dataset == "konrath" else 2
         plot_band(ax, TIME_POINTS[:n_tp], cell,
-                  color=UDE_COLOR[dataset], ls="-", label=DATASET_LABELS[dataset])
+                  color=UDE_COLOR[dataset], ls="-", label=DATASET_LABELS[dataset],
+                  zorder=zorder)
 
     ax.set_xlim(0, 20)
     ax.set_ylim(bottom=0)
@@ -208,7 +211,7 @@ for ax in ax_col1[2]:
 # Col 2: single axes
 ax_col2 = fig.add_subplot(gs[0, 2])
 
-for dataset in ["hunziker", "konrath"]:
+for dataset in ["konrath", "hunziker"]:
     x_grid, ys = load_crosstalk(RUNS[dataset]["UDE"])
     if x_grid is None:
         continue
