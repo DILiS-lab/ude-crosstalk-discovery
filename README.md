@@ -4,7 +4,7 @@ Source code for the paper:
 
 > **Universal differential equations for quantifying NF-κB – p53 signaling crosstalk**
 > Umur Can Kaya, Xhemal Kodragjini, Samuel Zambrano, Katharina Baum
-> *Submitted*
+> *Submitted to ECCB 2026*
 
 The framework uses universal differential equations (UDEs), mechanistic p53 ODE models augmented with a neural network component, to quantify NF-κB–p53 signaling crosstalk from 106 simultaneously measured single-cell time series. Symbolic regression then distills the learned crosstalk function into a compact closed-form expression.
 
