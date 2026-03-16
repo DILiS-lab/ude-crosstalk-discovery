@@ -16,4 +16,4 @@ experiments/
 real_data/
 
 # macOS files
-*.DS_Store
+*.DS_Store.claude
