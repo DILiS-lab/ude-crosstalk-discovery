@@ -166,7 +166,7 @@ def create_graphical_abstract():
     ax_b.set_title("b", loc="left", fontsize=FONT_SIZE, fontweight="bold", pad=2)
     ax_b.set_xticks([])
     ax_b.set_yticks([])
-    ax_b.set_ylabel(r"p53 + p53$_a$")
+    ax_b.set_ylabel(r"p53")
     ax_b.set_xlabel("Time")
     # Maintain limits from original plot
     ax_b.set_xlim(0, 20)
