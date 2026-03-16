@@ -1,119 +1,135 @@
+# UDE-crosstalk-discovery
 
-# Master Thesis Repository: Disentangling Signaling Pathway Crosstalk Using UDEs
+Source code for the paper:
 
-This repository contains code and resources for the experiments in the thesis, implemented in Python/JAX. Follow the instructions below to set up your environment and run the scripts.
+> **Universal differential equations for quantifying NF-κB – p53 signaling crosstalk**
+> Umur Can Kaya, Xhemal Kodragjini, Samuel Zambrano, Katharina Baum
+> *Submitted*
+
+The framework uses universal differential equations (UDEs), mechanistic p53 ODE models augmented with a neural network component, to quantify NF-κB–p53 signaling crosstalk from 106 simultaneously measured single-cell time series. Symbolic regression then distills the learned crosstalk function into a compact closed-form expression.
 
 ## Prerequisites
 
-- Python
-- uv: package manager for the dependencies (Follow the link to install uv: https://docs.astral.sh/uv/getting-started/installation/)
+- Python 3.10
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) — package manager
 
-## Setup Instructions
+## Setup
 
-1. Clone the repository and navigate to the `code` folder.
+1. Clone the repository and navigate to the `code` folder:
+   ```bash
+   cd code
+   ```
 2. Install dependencies:
-	```bash
-	uv sync
-	```
+   ```bash
+   uv sync
+   ```
 3. Activate the virtual environment:
-	```bash
-	# For Windows
-	. ./.venv/Scripts/activate
+   ```bash
+   # Mac/Linux
+   . ./.venv/bin/activate
 
-	# For Mac/Linux
-	. ./.venv/bin/activate
-	```
+   # Windows
+   . ./.venv/Scripts/activate
+   ```
 
-## Generating NF-κB signals 
-This section explains the process of generating NF-κB signals using different ODE systems. The generated NF-κB signals can then be used to simulate p53 time series.
-Currently, the script supports the Zambrano model [1], but you can easily include other models.
+## Workflow Overview
 
-### Set up the configuration
-Create a JSON config file for your experiment in the `/config` directory. You can use one of the provided template files as a starting point.
+The pipeline consists of three main stages:
 
-### Configure signal generation
-#### Generating multiple NF-κB signals
-Include the following variables in the config file:
-- `n_signals` - number of NF-κB signals to generate
-- `change_scale` - scale factor for variation of parameters from the original values
-- `sample_initial_conditions` - whether to sample multiple initial conditions (`Yes` or `No`)
+1. **Data generation** (synthetic experiments) — generate synthetic NF-κB and p53 time series with a known ground-truth crosstalk function
+2. **UDE training** — train a UDE on synthetic or real data to learn the hidden crosstalk function
+3. **Post-processing** — apply symbolic regression and Hill-type regression to the learned neural network output for interpretability
 
-#### Generating a single NF-κB signal
-Set `n_signals`: 1 and omit the other 2 parameters.
+## Running the Full Synthetic Pipeline
 
-### Run the script
-Use the following command to generate NF-κB signals:
+The easiest way to run a complete synthetic experiment (NF-κB generation → p53 simulation → UDE training) is via the master pipeline script:
 
 ```bash
-python generate_nfkb_signals.py config/your_config_file.json
+python run_full_synthetic_pipeline.py config/synthetic_pipeline_master_konrath.json
+# or
+python run_full_synthetic_pipeline.py config/synthetic_pipeline_master_hunziker.json
 ```
 
-## Generating p53 dynamics
-For the synthetic setup, we need p53 dynamics which serve as ground truth for training the UDE. The steps below explain how to generate such data purely without NF-κB impact, and after NF-κB signal impact. There are different models which can be used, out of which Konrath [2] and Hunziker [3] are currently supported.
+This orchestrates NF-κB signal generation, p53 data simulation with a known crosstalk function, and UDE training in a single run, storing all outputs in a unified experiment directory.
 
-### p53 dynamics without NF-κB impact
+## Running the Multivariate Study
 
-#### Configure the p53 data generation
-- Create a JSON file in the config directory, or copy from a template file there. 
-- Set some parameters regarding the ODE solver, including tolerance, max_steps, whether you want a stiff-ODE solver, and size of batch for batch-based solution.
-
-#### Run the script
-Use the following command:
-```bash
-python generate_p53_without_nfkb.py config/your_config_file.json
-```
-
-### p53 dynamics with NF-κB impact
-
-#### Configure the p53 data generation
-- Use the generated initial conditions, model parameters, and p53 data from previous experiment (without NF-κB) by adding the paths of these files in a new config file.
-- Adapt the other parameters according to your model.
-- Specify the `crosstalk_function_type` in the config file to set the assumed functional form of how NF-κB affects p53 synthesis. Available options:
-  - `"sigmoid"` - Sigmoid-shaped crosstalk function: `2 / (1 + exp(-x))`
-  - `"decreasing"` - Decreasing crosstalk function: `1 + 2/(x + 1)`
-  - `"oscillatory"` - Oscillatory crosstalk function: `|sin(x)|`
-
-#### Run the script
-Use the following command:
-```bash
-python generate_p53_with_nfkb.py config/your_config_file.json
-```
-
-## Running Universal Differential Equations (UDE)
-This section describes the steps to follow for training a UDE on p53 dynamics, where the p53 synthesis factor is approximated using a neural network. The p53-NF-κB crosstalk is assumed to impact the p53 dynamics through the p53 synthesis factor.
-
-During the UDE training, the neural network parameters and the model kinetic parameters are estimated. Model parameters are sampled from the original values within a change_scale. The following values need to be filled up in the "init_args" dictionary.
+To reproduce the systematic synthetic experiments from the paper (sweeping over models, crosstalk function types, noise levels, and sample sizes):
 
 ```bash
-"init_method": "init_resample",
-"init_args": {
-	"model_parameters": [],
-	"initial_conditions": [],
-	"change_scale": 0.1
-}
+python run_multivariate_study.py
 ```
 
-### UDEs in a synthetic setup
-The synthetic setup contains simulated p53 dynamics and an assumed crosstalk function, which is then compared to the learned crosstalk function. 
+Study parameters (models, crosstalk functions, noise levels `η`, sample sizes `M`) are configured at the top of the script. Results are aggregated into a summary CSV and stored under `experiments/`.
 
-Configure the `crosstalk_function_type` parameter in your config file to match the assumed functional form used during data generation. Available options are `"sigmoid"`, `"decreasing"`, or `"oscillatory"`.
+## Step-by-Step: Synthetic Data Experiments
 
-You can run the script below to train in a synthetic setup:
+### 1. Generate NF-κB signals
 
 ```bash
-python train_ude_synthetic_data.py config/your_config_file
+python generate_nfkb_signals.py config/nfkb_signal_generation_zambrano.json
 ```
 
+Config parameters:
 
-### UDEs in real-data setup
-The real-data setup, as the name suggests, contains the real p53 dynamics measured in lab/clinical environment. Data needs to be stored in a `real_data` folder in the main directory. There is no assumed crosstalk function, and the script below needs to be run:
+- `n_signals` — number of signals to generate
+- `change_scale` — parameter variation scale relative to nominal values
+- `sample_initial_conditions` — `"Yes"` or `"No"`
+
+### 2. Generate p53 dynamics without crosstalk
 
 ```bash
-python train_ude_real_data.py config/your_config_file
+python generate_p53_without_nfkb.py config/synthetic_data_p53_no_nfkb_konrath.json
 ```
 
-## Re-using the crosstalk factor neural network
-The neural network parameters are saved after training in the experiment folder in the file `neural_network.eqx`. To re-use the neural network, simply add the following lines of code in your Python file:
+### 3. Generate p53 dynamics with crosstalk
+
+```bash
+python generate_p53_with_nfkb.py config/synthetic_data_p53_nfkb_func_konrath.json
+```
+
+Set `crosstalk_function_type` in the config to one of:
+
+- `"monoton_increasing_weak_hill"` — weak activating Hill function
+- `"monoton_increasing_strong_hill"` — strong activating Hill function
+- `"monoton_decreasing_weak_hill"` — weak inhibitory Hill function
+- `"monoton_decreasing_strong_hill"` — strong inhibitory Hill function
+
+### 4. Train the UDE (synthetic)
+
+```bash
+python train_ude_synthetic_data.py config/ude_p53_konrath_init_resample.json
+```
+
+Set `crosstalk_function_type` to match the function used in step 3.
+
+## Step-by-Step: Real Data Experiments
+
+The experimental single-cell p53 and NF-κB time series (106 cells, 200 time points) must be placed in the `real_data/` folder. The data was generated in [Colombo et al. 2026] and is available from that publication.
+
+### Train the baseline ODE (no crosstalk)
+
+```bash
+python train_ode_real_data.py config/ude_p53_konrath_real_data_init_resample.json
+```
+
+### Train the UDE (with crosstalk)
+
+```bash
+python train_ude_real_data.py config/ude_p53_konrath_real_data_init_resample.json
+```
+
+For ensemble runs used in the paper:
+
+```bash
+python train_ude_real_data.py config/ude_p53_konrath_real_data_multi_run.json
+```
+
+Hunziker-based equivalents follow the same pattern using `ude_p53_hunziker_real_data_*.json`.
+
+## Reusing Trained Models
+
+### Load the neural network
 
 ```python
 import jax
@@ -122,49 +138,58 @@ import equinox as eqx
 
 key = jax.random.PRNGKey(0)
 neural_net = SynthNN(key)
-
-neural_net_single = eqx.tree_deserialise_leaves("Path of file neural_network.eqx", neural_net)
-neural_net = jax.vmap(lambda x: neural_net_single(x)) # handle multiple inputs
-predictions = neural_net(input.reshape(-1,1))
+neural_net_single = eqx.tree_deserialise_leaves("path/to/neural_network.eqx", neural_net)
+neural_net = jax.vmap(lambda x: neural_net_single(x))
+predictions = neural_net(nfkb_values.reshape(-1, 1))
 ```
 
-## Loading the symbolic regression externally
-
-If you have run symbolic regression, you can load the resulting function in the `load_symbolic_model_externally.py` file. Specify as input of the function the experiment folder path from which the symbolic regression is.
+### Load the symbolic regression result
 
 ```python
 from load_symbolic_model_externally import load_symbolic_model_externally
 
-symbolic_model = load_symbolic_model_externally(experiment_folder_path)
+symbolic_model = load_symbolic_model_externally("path/to/experiment/folder")
 symbolic_values = symbolic_model(nfkb_values)
 ```
 
-## Loading the UDE externally with learned parameters
-
-If you want to load a previously trained UDE and solve it, you can use the `load_ude_model_externally.py` file. 
-Run the following command with the specific experiment path:
+### Load a full trained UDE and solve it
 
 ```bash
-python load_ude_model_externally D:/User/X/your-experiment-full-path
+python load_ude_model_externally.py /path/to/your/experiment/folder
 ```
 
-## Folder Structure
+## Repository Structure
 
-- `config/` — Experiment configuration files and templates
-- `experiments/` — Output folders for each experiment
-- `utils/` — Helper scripts and model definitions
-- `real_data/` - Folder containing the real single-cell p53 and NF-κB trajectories
-
+```
+code/
+├── config/                        # Config files for all experiments
+├── experiments/                   # Output directories (created at runtime)
+├── plots/                         # Figures for the paper
+├── real_data/                     # Single-cell p53 and NF-κB time series
+├── utils/                         # Model definitions, ODE/UDE solvers, plotting
+│   ├── models.py                  # UDE and ODE model implementations
+│   ├── neural_networks.py         # MLP architecture for crosstalk function
+│   ├── differential_equations_functions.py
+│   ├── symbolic_new_regression_multi.py  # Symbolic regression (ensemble)
+│   ├── hill_regression_multi.py   # Hill-type regression on learned crosstalk
+│   ├── plot_functions.py
+│   └── ...
+├── generate_nfkb_signals.py       # Generate synthetic NF-κB time series
+├── generate_p53_without_nfkb.py   # Generate p53 without crosstalk
+├── generate_p53_with_nfkb.py      # Generate p53 with known crosstalk function
+├── train_ude_synthetic_data.py    # Train UDE on synthetic data
+├── train_ude_real_data.py         # Train UDE on experimental data
+├── train_ode_real_data.py         # Train baseline ODE (no crosstalk) on real data
+├── run_full_synthetic_pipeline.py # End-to-end synthetic pipeline runner
+├── run_multivariate_study.py      # Sweep over models / noise / sample sizes
+├── load_symbolic_model_externally.py
+└── load_ude_model_externally.py
+```
 
 ## References
 
-[1] S. Zambrano, M. E. Bianchi, and A. Agresti, “A simple model of NF-κB dy-
-namics reproduces experimental observations,” Journal of Theoretical Biology,
-vol. 347, pp. 44–53, 2014.
+[2] F. Konrath, A. Mittermeier, E. Cristiano, J. Wolf, and A. Loewer, "A systematic approach to decipher crosstalk in the p53 signaling pathway using single cell dynamics," *PLOS Computational Biology*, vol. 16, no. 6, p. e1007901, 2020.
 
-[2] F. Konrath, A. Mittermeier, E. Cristiano, J. Wolf, and A. Loewer, “A systematic
-approach to decipher crosstalk in the p53 signaling pathway using single cell
-dynamics,” PLOS Computational Biology, vol. 16, no. 6, p. e1007901, 2020.
+[3] A. Hunziker, M. H. Jensen, and S. Krishna, "Stress-specific response of the p53-Mdm2 feedback loop," *BMC Systems Biology*, vol. 4, no. 1, p. 94, 2010.
 
-[3] A. Hunziker, M. H. Jensen, and S. Krishna, “Stress-specific response of the
-p53-Mdm2 feedback loop,” BMC Systems Biology, vol. 4, no. 1, p. 94, 2010.
+[4] E. Colombo et al., "NF-κB transcriptionally contributes to the up-regulation of p53 through increased *TP53* expression," 2026.
