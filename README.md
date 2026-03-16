@@ -8,6 +8,8 @@ Source code for the paper:
 
 The framework uses universal differential equations (UDEs), mechanistic p53 ODE models augmented with a neural network component, to quantify NF-κB–p53 signaling crosstalk from 106 simultaneously measured single-cell time series. Symbolic regression then distills the learned crosstalk function into a compact closed-form expression.
 
+![Graphical Abstract](code/plots/graphical_abstract/graphical_abstract_structure.pdf)
+
 ## Prerequisites
 
 - Python 3.10
