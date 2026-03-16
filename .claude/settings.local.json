@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(uv run python3:*)",
-      "Bash(conda activate base)"
-    ]
-  }
-}
