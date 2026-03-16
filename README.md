@@ -188,8 +188,8 @@ code/
 
 ## References
 
-[2] F. Konrath, A. Mittermeier, E. Cristiano, J. Wolf, and A. Loewer, "A systematic approach to decipher crosstalk in the p53 signaling pathway using single cell dynamics," *PLOS Computational Biology*, vol. 16, no. 6, p. e1007901, 2020.
+[1] F. Konrath, A. Mittermeier, E. Cristiano, J. Wolf, and A. Loewer, "A systematic approach to decipher crosstalk in the p53 signaling pathway using single cell dynamics," *PLOS Computational Biology*, vol. 16, no. 6, p. e1007901, 2020.
 
-[3] A. Hunziker, M. H. Jensen, and S. Krishna, "Stress-specific response of the p53-Mdm2 feedback loop," *BMC Systems Biology*, vol. 4, no. 1, p. 94, 2010.
+[2] A. Hunziker, M. H. Jensen, and S. Krishna, "Stress-specific response of the p53-Mdm2 feedback loop," *BMC Systems Biology*, vol. 4, no. 1, p. 94, 2010.
 
-[4] E. Colombo et al., "NF-κB transcriptionally contributes to the up-regulation of p53 through increased *TP53* expression," 2026.
+[3] E. Colombo et al., "NF-κB transcriptionally contributes to the up-regulation of p53 through increased *TP53* expression," 2026.
