@@ -14,6 +14,7 @@ docs/
 *archive/
 experiments/
 real_data/
+temp/
 
 # macOS files
 *.DS_Store

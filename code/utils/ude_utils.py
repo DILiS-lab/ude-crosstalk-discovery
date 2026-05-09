@@ -295,11 +295,12 @@ def train_ude(
     stiff,
     model_name,
     min_ic=None,
-    max_ic=None, 
+    max_ic=None,
     offset_factor=None,
     scaling_factor=None,
     key=None,
     nn_factory=None,
+    freeze_nn: bool = False,
 ):
     """
     Train a UDE model using the provided data and parameters.
@@ -379,6 +380,13 @@ def train_ude(
         optax.adamw(learning_rate=learning_rate, weight_decay=0.01 * learning_rate),
     )
 
+    # When freeze_nn=True, capture the pretrained NN to restore after every batch.
+    # The optimizer still runs on all params (including the NN), but the NN weights
+    # are unconditionally reset to their pretrained values after each update, so
+    # they never actually change. This avoids optax.multi_transform pytree
+    # compatibility issues with equinox modules under JAX 0.6+.
+    frozen_nn_ref = synth_nn if freeze_nn else None
+
     opt_state = optim.init(eqx.filter(trainable_vars, eqx.is_array))
 
     N = n_samples
@@ -418,6 +426,10 @@ def train_ude(
                 offset_factor,
                 scaling_factor,
             )
+
+            # Restore the pretrained NN after every batch to keep it frozen.
+            if frozen_nn_ref is not None:
+                trainable_vars = {**trainable_vars, "nn": frozen_nn_ref}
 
             epoch_loss += l
             num_batches += 1
