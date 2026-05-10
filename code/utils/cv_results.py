@@ -124,7 +124,30 @@ def load_cv_results(
             .reset_index(name="rmse_across_cells")
         )
 
+    elif reduce == "per_cell_rel":
+        # Relative MAE per cell: mean_t(|error|) / mean_t(|true|)
+        return (
+            df.groupby(["fold", "seed", "phase", "cell_index"], sort=False)
+            .apply(
+                lambda g: g["error"].abs().mean() / g["p53_true"].abs().mean(),
+                include_groups=False,
+            )
+            .reset_index(name="rel_mae")
+        )
+
+    elif reduce == "per_time_rel":
+        # Relative MAE per timepoint: mean_c(|error|) / mean_c(|true|)
+        return (
+            df.groupby(["fold", "seed", "phase", "timepoint"], sort=False)
+            .apply(
+                lambda g: g["error"].abs().mean() / g["p53_true"].abs().mean(),
+                include_groups=False,
+            )
+            .reset_index(name="rel_mae")
+        )
+
     else:
         raise ValueError(
-            f"reduce must be 'none', 'per_cell', or 'per_time'; got {reduce!r}"
+            f"reduce must be 'none', 'per_cell', 'per_time', 'per_cell_rel', or "
+            f"'per_time_rel'; got {reduce!r}"
         )
