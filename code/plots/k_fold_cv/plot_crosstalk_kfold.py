@@ -13,8 +13,6 @@ import sys
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
 
 CODE_DIR   = Path(__file__).resolve().parents[2]
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -32,11 +30,10 @@ DATASETS = {
     },
 }
 
-FOLD_COLORS  = ["C0", "C1", "C2", "C3", "C4"]
-FULL_COLOR   = "black"
-N_GRID       = 1000
-ALPHA_BAND   = 0.20
-ALPHA_FULL   = 0.15
+FOLD_COLORS = ["C0", "C1", "C2", "C3", "C4"]
+FULL_COLOR  = "black"
+N_GRID      = 1000
+ALPHA_FULL  = 0.15
 
 plt.rcParams.update({
     "font.size": 6, "axes.labelsize": 6, "axes.titlesize": 6,
@@ -76,14 +73,6 @@ def load_crosstalk_curves(csv_paths, n_grid=N_GRID):
     return x_grid, ys
 
 
-def plot_band(ax, x, ys, color, lw, alpha, label, zorder=2):
-    mean = ys.mean(axis=0)
-    lo   = np.percentile(ys,  5, axis=0)
-    hi   = np.percentile(ys, 95, axis=0)
-    ax.plot(x, mean, color=color, lw=lw, zorder=zorder, label=label)
-    ax.fill_between(x, lo, hi, color=color, alpha=alpha, zorder=zorder - 1)
-
-
 for dataset, cfg in DATASETS.items():
     out_dir = SCRIPT_DIR / dataset
     out_dir.mkdir(exist_ok=True)
@@ -92,9 +81,8 @@ for dataset, cfg in DATASETS.items():
 
     kfold_dir = Path(cfg["kfold_dir"])
     fold_dirs  = sorted(d for d in kfold_dir.glob("fold_*") if d.is_dir())
-    n_folds    = len(fold_dirs)
 
-    # ── per-fold bands ────────────────────────────────────────────────────────
+    # ── per-fold mean lines (no fill) ─────────────────────────────────────────
     for fi, fold_dir in enumerate(fold_dirs):
         fold_id = int(fold_dir.name.split("_")[1])
         csvs = list(fold_dir.glob("seed_*/train/learned_crosstalk_factor_values.csv"))
@@ -107,16 +95,21 @@ for dataset, cfg in DATASETS.items():
             continue
 
         color = FOLD_COLORS[fi % len(FOLD_COLORS)]
-        plot_band(ax, x, ys, color=color, lw=0.8, alpha=ALPHA_BAND,
-                  label=f"Fold {fold_id + 1}", zorder=2)
+        ax.plot(x, ys.mean(axis=0), color=color, lw=0.8,
+                label=f"Fold {fold_id + 1}", zorder=2)
 
-    # ── full-UDE reference ────────────────────────────────────────────────────
+    # ── full-UDE reference band ───────────────────────────────────────────────
     full_csvs = list(Path(cfg["ude_dir"]).glob("run_seed_*/learned_crosstalk_factor_values.csv"))
     if full_csvs:
         x_full, ys_full = load_crosstalk_curves(full_csvs)
         if x_full is not None:
-            plot_band(ax, x_full, ys_full, color=FULL_COLOR, lw=1.2,
-                      alpha=ALPHA_FULL, label="UDE (full data)", zorder=4)
+            mean = ys_full.mean(axis=0)
+            lo   = np.percentile(ys_full,  5, axis=0)
+            hi   = np.percentile(ys_full, 95, axis=0)
+            ax.plot(x_full, mean, color=FULL_COLOR, lw=1.2,
+                    label="UDE (full data)", zorder=4)
+            ax.fill_between(x_full, lo, hi, color=FULL_COLOR,
+                            alpha=ALPHA_FULL, zorder=3)
     else:
         print(f"  No full-UDE crosstalk CSVs found for {dataset}")
 

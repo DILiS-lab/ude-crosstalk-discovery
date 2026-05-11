@@ -25,13 +25,13 @@ DATASETS = {
         "kfold_dir": CODE_DIR / "experiments" / "ude_konrath2020_kfold_5fold_2026-05-09_170241",
         "ude_dir":   CODE_DIR / "experiments" / "ude_konrath2020_uncertainty_2026-01-20_100950",
         "ode_dir":   CODE_DIR / "experiments" / "ode_konrath2020_uncertainty_2026-01-20_142837",
-        "label":     "Konrath et al. (2020)",
+        "label":     "Konrath",
     },
     "hunziker": {
         "kfold_dir": CODE_DIR / "experiments" / "ude_hunziker2010_kfold_5fold_2026-05-10_075001",
         "ude_dir":   CODE_DIR / "experiments" / "ude_hunziker2010_uncertainty_2026-01-20_181050",
         "ode_dir":   CODE_DIR / "experiments" / "ode_hunziker2010_uncertainty_2026-01-19_132644",
-        "label":     "Hunziker et al. (2010)",
+        "label":     "Hunziker",
     },
 }
 
@@ -48,7 +48,7 @@ HATCH_TEST     = "////"
 plt.rcParams.update({
     "font.size": 6, "axes.labelsize": 6, "axes.titlesize": 6,
     "xtick.labelsize": 6, "ytick.labelsize": 6,
-    "legend.fontsize": 6, "lines.linewidth": 0.5,
+    "legend.fontsize": 6, "lines.linewidth": 0.1,
     "axes.linewidth": 0.5,
     "xtick.major.width": 0.5, "ytick.major.width": 0.5,
     "xtick.major.size": 2, "ytick.major.size": 2,
@@ -111,7 +111,7 @@ for dataset, cfg in DATASETS.items():
     ude_mat = load_full_rel_mae_matrix(cfg["ude_dir"], true_global)
     ode_mat = load_full_rel_mae_matrix(cfg["ode_dir"], true_global)
 
-    fig, ax = plt.subplots(figsize=(5.5, 2.2))
+    fig, ax = plt.subplots(figsize=(7.5, 2.2))
 
     fold_centres = [f * FOLD_SPACING for f in range(len(folds))]
     # within-fold offsets for 6 violins (train/test × 3 models)
@@ -147,19 +147,22 @@ for dataset, cfg in DATASETS.items():
     ax.set_xticks(fold_centres)
     ax.set_xticklabels([f"Fold {f + 1}" for f in folds])
     ax.set_xlim(-FOLD_SPACING * 0.6, fold_centres[-1] + FOLD_SPACING * 0.6)
+    ax.set_ylim(0, 0.5)
+    ax.set_yticks(np.arange(0, 0.51, 0.05))
     ax.set_ylabel("Relative MAE (per cell, over time)")
     ax.grid(axis="y", ls="-", alpha=0.1, lw=0.1, c="k")
     ax.set_title(cfg["label"])
 
     legend_handles = [
-        Patch(facecolor=KFOLD_COLOR,    alpha=0.5, label="UDE k-fold — train cells"),
-        Patch(facecolor=KFOLD_COLOR,    alpha=0.5, hatch=HATCH_TEST, label="UDE k-fold — test cells"),
-        Patch(facecolor=UDE_FULL_COLOR, alpha=0.5, label="UDE full — train cells"),
-        Patch(facecolor=UDE_FULL_COLOR, alpha=0.5, hatch=HATCH_TEST, label="UDE full — test cells"),
-        Patch(facecolor=ODE_FULL_COLOR, alpha=0.5, label="ODE full — train cells"),
-        Patch(facecolor=ODE_FULL_COLOR, alpha=0.5, hatch=HATCH_TEST, label="ODE full — test cells"),
+        Patch(facecolor=KFOLD_COLOR,    alpha=0.5, label="UDE (CV train, train)"),
+        Patch(facecolor=KFOLD_COLOR,    alpha=0.5, hatch=HATCH_TEST, label="UDE (CV train, test)"),
+        Patch(facecolor=UDE_FULL_COLOR, alpha=0.5, label="UDE (full, train)"),
+        Patch(facecolor=UDE_FULL_COLOR, alpha=0.5, hatch=HATCH_TEST, label="UDE (full, test)"),
+        Patch(facecolor=ODE_FULL_COLOR, alpha=0.5, label="ODE (full, train)"),
+        Patch(facecolor=ODE_FULL_COLOR, alpha=0.5, hatch=HATCH_TEST, label="ODE (full, test)"),
     ]
-    ax.legend(handles=legend_handles, loc="upper right", frameon=False, ncol=2)
+    ax.legend(handles=legend_handles, loc="upper right", ncol=3,
+              title="Model (trained on, evaluated on)", title_fontsize=6)
 
     fig.tight_layout()
     out = out_dir / "rmse_per_fold_boxplot.pdf"
