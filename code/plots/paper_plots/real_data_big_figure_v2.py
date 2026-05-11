@@ -27,7 +27,7 @@ UDE_COLOR       = {"hunziker": "C1", "konrath": "C0"}
 ODE_COLOR       = {"hunziker": "C1", "konrath": "C0"}
 MODEL_LS        = {"UDE": "-", "ODE": ":"}
 grid_keywords   = {"ls": "-", "alpha": 0.1, "lw": 0.1, "c": "k"}
-SAMPLE_INDICES  = (24, 47, 10, 35, 5, 60, 80, 15, 90)  # 9 cells for the 3×3 grid
+SAMPLE_INDICES  = (47, 24, 10, 35, 5, 60, 80, 15, 90)  # 9 cells for the 3×3 grid
 
 CROSSTALK_COLOR = {"hunziker": "C1", "konrath": "C0"}
 SR_FUNCS = {
@@ -165,6 +165,20 @@ for dataset, ax in zip(DATASETS_BY_ROW, [ax_col0_r0, ax_col0_r1]):
 true_p53 = np.loadtxt(TRUE_P53_PATH, delimiter=",")
 ude_p53  = {ds: load_p53(RUNS[ds]["UDE"]) for ds in ["konrath", "hunziker"]}
 
+
+def _rel_mae(dataset, sample_idx):
+    data = ude_p53[dataset]
+    if data is None:
+        return None, None
+    n_tp = data.shape[1]
+    true_cell = true_p53[:n_tp, sample_idx]
+    denom = np.mean(np.abs(true_cell))
+    if denom == 0:
+        return None, None
+    mae_seeds = np.mean(np.abs(true_cell[np.newaxis, :] - data[:, :, sample_idx]), axis=1) / denom
+    return float(np.mean(mae_seeds)), float(np.std(mae_seeds))
+
+
 for panel_idx, sample_idx in enumerate(SAMPLE_INDICES):
     r, c = divmod(panel_idx, 3)
     if (r, c) == (0, 2):
@@ -188,6 +202,15 @@ for panel_idx, sample_idx in enumerate(SAMPLE_INDICES):
     ax.set_xlim(0, 20)
     ax.set_ylim(bottom=0)
     ax.grid(True, **grid_keywords)
+
+    # Relative MSE in bottom-left: konrath above hunziker
+    for i, ds in enumerate(["konrath", "hunziker"]):
+        mean, std = _rel_mae(ds, sample_idx)
+        if mean is not None:
+            prefix = "rMAE=" if (r, c) == (0, 0) else ""
+            ax.text(0.95, 0.20 - i * 0.13, f"{prefix}{mean:.3f}±{std:.3f}",
+                    transform=ax.transAxes, fontsize=4,
+                    color=UDE_COLOR[ds], va="bottom", ha="right")
 
 ax_col1[0][2].axis("off")
 # Place legend in the hidden top-right axes area

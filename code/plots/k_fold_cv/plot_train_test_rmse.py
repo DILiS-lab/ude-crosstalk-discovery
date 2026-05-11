@@ -31,10 +31,10 @@ DATASETS = {
     },
 }
 
-TRAIN_COLOR    = "C0"
-TEST_COLOR     = "C1"
-UDE_FULL_COLOR = "C2"
-ODE_FULL_COLOR = "C3"
+TRAIN_COLOR    = "C2"
+TEST_COLOR     = "C3"
+UDE_FULL_COLOR = "C4"
+ODE_FULL_COLOR = "C5"
 
 plt.rcParams.update({
     "font.size": 6, "axes.labelsize": 6, "axes.titlesize": 6,
@@ -77,9 +77,12 @@ for dataset, cfg in DATASETS.items():
 
     rng = np.random.default_rng(0)
 
+    YLIM = (0, 0.5)
+    clipped = [np.clip(v, *YLIM) for v in all_data]
+
     fig, ax = plt.subplots(figsize=(2.8, 2.0))
 
-    vp = ax.violinplot(all_data, positions=positions,
+    vp = ax.violinplot(clipped, positions=positions,
                        widths=0.55, showmedians=True, showextrema=False)
 
     for body, color in zip(vp["bodies"], colors):
@@ -91,7 +94,7 @@ for dataset, cfg in DATASETS.items():
     vp["cmedians"].set_color("k")
     vp["cmedians"].set_linewidth(0.8)
 
-    for pos, vals, color in zip(positions, all_data, colors):
+    for pos, vals, color in zip(positions, clipped, colors):
         jitter = rng.uniform(-0.08, 0.08, len(vals))
         ax.scatter(pos + jitter, vals, s=0.5, color=color, alpha=0.25, lw=0)
 
@@ -99,8 +102,8 @@ for dataset, cfg in DATASETS.items():
     ax.set_xticklabels(labels)
     ax.set_ylabel("Relative MAE (per cell, over time)")
     ax.set_xlim(-0.5, 3.5)
-    ax.set_ylim(0, 1)
-    ax.set_yticks(np.arange(0, 1.1, 0.1))
+    ax.set_ylim(*YLIM)
+    ax.set_yticks(np.arange(YLIM[0], YLIM[1] + 0.1, 0.1))
     ax.grid(axis="y", ls="-", alpha=0.1, lw=0.1, c="k")
     ax.set_title(cfg["label"])
 
