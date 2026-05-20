@@ -109,6 +109,23 @@ Set `crosstalk_function_type` to match the function used in step 3.
 
 The experimental single-cell p53 and NF-κB time series (106 cells, 200 time points) must be placed in the `real_data/` folder. The data was generated in [Colombo et al. 2026] and is available from that publication.
 
+### 5-Fold Cross-Validation
+
+To evaluate generalisation with k-fold cross-validation, use the dedicated supervisor script. It automatically spawns one worker process per fold × seed combination:
+
+```bash
+python train_ude_real_data_kfold.py config/ude_p53_konrath_kfold_verify.json
+```
+
+The config must include two additional keys on top of the standard real-data keys:
+
+| Key | Description |
+|-----|-------------|
+| `n_folds` | Number of folds (e.g. `5` for 5-fold CV) |
+| `cv_seed` | Random seed used to generate the fold splits |
+
+Results for all folds and seeds are written to a single batch directory under `experiments/`. Symbolic regression and Hill regression are **not** run automatically in this mode.
+
 ### Train the baseline ODE (no crosstalk)
 
 ```bash
@@ -181,6 +198,7 @@ code/
 ├── generate_p53_with_nfkb.py      # Generate p53 with known crosstalk function
 ├── train_ude_synthetic_data.py    # Train UDE on synthetic data
 ├── train_ude_real_data.py         # Train UDE on experimental data
+├── train_ude_real_data_kfold.py   # K-fold cross-validation for real-data UDE experiments
 ├── train_ode_real_data.py         # Train baseline ODE (no crosstalk) on real data
 ├── run_full_synthetic_pipeline.py # End-to-end synthetic pipeline runner
 ├── run_multivariate_study.py      # Sweep over models / noise / sample sizes
