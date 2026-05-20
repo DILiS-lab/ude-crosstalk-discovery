@@ -1,15 +1,11 @@
 """
-Six-violin per fold comparison:
-  (UDE-kfold | UDE-full | ODE-full) × (train-cells | test-cells)
+Train and test relative MAE per fold (paired box plot) with UDE-full and ODE-full reference lines.
 
-UDE-kfold is retrained per fold; UDE-full and ODE-full are trained on
-the complete dataset, but their per-cell errors are split by the
-fold's train/test cell membership — an equivalent oracle comparison.
+Produces one figure per dataset, saved under k_fold_cv/{dataset}/.
 """
 import sys
 from pathlib import Path
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
@@ -25,30 +21,27 @@ DATASETS = {
         "kfold_dir": CODE_DIR / "experiments" / "ude_konrath2020_kfold_5fold_2026-05-09_170241",
         "ude_dir":   CODE_DIR / "experiments" / "ude_konrath2020_uncertainty_2026-01-20_100950",
         "ode_dir":   CODE_DIR / "experiments" / "ode_konrath2020_uncertainty_2026-01-20_142837",
-        "label":     "Konrath",
+        "label":     "Konrath et al. (2020)",
     },
     "hunziker": {
         "kfold_dir": CODE_DIR / "experiments" / "ude_hunziker2010_kfold_5fold_2026-05-10_075001",
         "ude_dir":   CODE_DIR / "experiments" / "ude_hunziker2010_uncertainty_2026-01-20_181050",
         "ode_dir":   CODE_DIR / "experiments" / "ode_hunziker2010_uncertainty_2026-01-19_132644",
-        "label":     "Hunziker",
+        "label":     "Hunziker et al. (2010)",
     },
 }
 
-# Colors by model; phase distinguished by hatch
-KFOLD_COLOR    = "C0"
+TRAIN_COLOR    = "C0"
+TEST_COLOR     = "C1"
 UDE_FULL_COLOR = "C2"
 ODE_FULL_COLOR = "C3"
-
-FOLD_SPACING   = 2.0     # distance between fold centres
-VIOLIN_SPACING = 0.28    # centre-to-centre within a fold (6 violins → span 1.4)
-VIOLIN_WIDTH   = 0.22
-HATCH_TEST     = "////"
+WIDTH  = 0.3
+OFFSET = 0.18
 
 plt.rcParams.update({
     "font.size": 6, "axes.labelsize": 6, "axes.titlesize": 6,
     "xtick.labelsize": 6, "ytick.labelsize": 6,
-    "legend.fontsize": 6, "lines.linewidth": 0.1,
+    "legend.fontsize": 6, "lines.linewidth": 0.5,
     "axes.linewidth": 0.5,
     "xtick.major.width": 0.5, "ytick.major.width": 0.5,
     "xtick.major.size": 2, "ytick.major.size": 2,
@@ -56,113 +49,84 @@ plt.rcParams.update({
 })
 
 
-def load_full_rel_mae_matrix(exp_dir, true):
-    """
-    Return a (n_seeds, C) array where entry [s, c] is the relative MAE
-    of seed s on cell c over all timepoints.
-    """
-    true = np.atleast_2d(true)       # ensure (T, C)
-    denom = np.abs(true).mean(axis=0)  # (C,)
-    mats = []
+def load_full_rel_mae_per_cell(exp_dir):
+    true = np.loadtxt(TRUE_PATH, delimiter=",")
+    vals = []
     for seed_dir in sorted(Path(exp_dir).glob("run_seed_*")):
         pred_path = seed_dir / "p53_generated.csv"
         if not pred_path.exists():
             continue
         pred = np.loadtxt(pred_path, delimiter=",")
-        rel_mae = np.abs(pred - true).mean(axis=0) / denom  # (C,)
-        mats.append(rel_mae)
-    return np.array(mats)   # (n_seeds, C)
+        rel_mae = np.abs(pred - true).mean(axis=0) / np.abs(true).mean(axis=0)
+        vals.append(rel_mae)
+    return np.concatenate(vals)
 
 
-def make_bp(ax, data, pos, color, hatch=None):
+def make_bp(ax, data, positions, color):
     bp = ax.boxplot(
         data,
-        positions=[pos],
-        widths=VIOLIN_WIDTH,
+        positions=positions,
+        widths=WIDTH,
         patch_artist=True,
-        showfliers=False,
         medianprops=dict(color="k", linewidth=0.8),
         whiskerprops=dict(linewidth=0.5),
         capprops=dict(linewidth=0.5),
+        flierprops=dict(marker="o", markersize=1, markeredgewidth=0.3,
+                        markerfacecolor=color, markeredgecolor=color, alpha=0.4),
     )
     for patch in bp["boxes"]:
         patch.set_facecolor(color)
-        patch.set_alpha(0.45)
-        if hatch:
-            patch.set_hatch(hatch)
+        patch.set_alpha(0.4)
     return bp
 
-
-true_global = np.loadtxt(TRUE_PATH, delimiter=",")   # (T, C_total)
 
 for dataset, cfg in DATASETS.items():
     out_dir = SCRIPT_DIR / dataset
     out_dir.mkdir(exist_ok=True)
 
-    # ── k-fold CV results (UDE retrained per fold) ──────────────────────────
     df = load_cv_results(cfg["kfold_dir"], reduce="per_cell_rel")
     folds = sorted(df["fold"].unique())
 
-    # ── fold → cell membership ───────────────────────────────────────────────
-    splits = pd.read_csv(cfg["kfold_dir"] / "fold_splits.csv")
-    # fold_splits.csv: cell_index, fold_id  (fold_id = fold this cell is TEST in)
+    train_data = [df.loc[(df["fold"] == f) & (df["phase"] == "train"), "rel_mae"].values for f in folds]
+    test_data  = [df.loc[(df["fold"] == f) & (df["phase"] == "test"),  "rel_mae"].values for f in folds]
 
-    # ── full-model per-cell rel-MAE matrices (n_seeds, C) ───────────────────
-    ude_mat = load_full_rel_mae_matrix(cfg["ude_dir"], true_global)
-    ode_mat = load_full_rel_mae_matrix(cfg["ode_dir"], true_global)
+    train_positions = [f - OFFSET for f in folds]
+    test_positions  = [f + OFFSET for f in folds]
 
-    fig, ax = plt.subplots(figsize=(7.5, 2.2))
+    ude_median = np.median(load_full_rel_mae_per_cell(cfg["ude_dir"]))
+    ode_median = np.median(load_full_rel_mae_per_cell(cfg["ode_dir"]))
 
-    fold_centres = [f * FOLD_SPACING for f in range(len(folds))]
-    # within-fold offsets for 6 violins (train/test × 3 models)
-    offsets = np.array([-2.5, -1.5, -0.5, 0.5, 1.5, 2.5]) * VIOLIN_SPACING
+    rng = np.random.default_rng(1)
 
-    for fi, (f, cx) in enumerate(zip(folds, fold_centres)):
-        test_cells  = splits.loc[splits["fold_id"] == f,  "cell_index"].values
-        train_cells = splits.loc[splits["fold_id"] != f, "cell_index"].values
+    fig, ax = plt.subplots(figsize=(3.5, 2.0))
 
-        # UDE-kfold (retrained) — train and test sets
-        kf_train = df.loc[(df["fold"] == f) & (df["phase"] == "train"), "rel_mae"].values
-        kf_test  = df.loc[(df["fold"] == f) & (df["phase"] == "test"),  "rel_mae"].values
+    make_bp(ax, train_data, train_positions, TRAIN_COLOR)
+    make_bp(ax, test_data,  test_positions,  TEST_COLOR)
 
-        # UDE-full sliced to fold membership
-        ude_train = ude_mat[:, train_cells].ravel()
-        ude_test  = ude_mat[:, test_cells].ravel()
+    for pos, vals, color in (list(zip(train_positions, train_data, [TRAIN_COLOR] * len(folds))) +
+                              list(zip(test_positions,  test_data,  [TEST_COLOR]  * len(folds)))):
+        jitter = rng.uniform(-0.06, 0.06, len(vals))
+        ax.scatter(pos + jitter, vals, s=1.0, color=color, alpha=0.3, lw=0)
 
-        # ODE-full sliced to fold membership
-        ode_train = ode_mat[:, train_cells].ravel()
-        ode_test  = ode_mat[:, test_cells].ravel()
+    ax.axhline(ude_median, color=UDE_FULL_COLOR, ls="--", lw=0.8, label="UDE full (median)")
+    ax.axhline(ode_median, color=ODE_FULL_COLOR, ls="--", lw=0.8, label="ODE full (median)")
 
-        groups = [
-            (kf_train,  KFOLD_COLOR,    None),
-            (kf_test,   KFOLD_COLOR,    HATCH_TEST),
-            (ude_train, UDE_FULL_COLOR, None),
-            (ude_test,  UDE_FULL_COLOR, HATCH_TEST),
-            (ode_train, ODE_FULL_COLOR, None),
-            (ode_test,  ODE_FULL_COLOR, HATCH_TEST),
-        ]
-        for (vals, color, hatch), off in zip(groups, offsets):
-            make_bp(ax, vals, cx + off, color, hatch)
-
-    ax.set_xticks(fold_centres)
-    ax.set_xticklabels([f"Fold {f + 1}" for f in folds])
-    ax.set_xlim(-FOLD_SPACING * 0.6, fold_centres[-1] + FOLD_SPACING * 0.6)
-    ax.set_ylim(0, 0.5)
-    ax.set_yticks(np.arange(0, 0.51, 0.05))
+    ax.set_xticks(folds)
+    ax.set_xticklabels([f"Fold {f}" for f in folds])
+    ax.set_xlim(-0.5, max(folds) + 0.5)
     ax.set_ylabel("Relative MAE (per cell, over time)")
     ax.grid(axis="y", ls="-", alpha=0.1, lw=0.1, c="k")
     ax.set_title(cfg["label"])
 
-    legend_handles = [
-        Patch(facecolor=KFOLD_COLOR,    alpha=0.5, label="UDE (CV train, train)"),
-        Patch(facecolor=KFOLD_COLOR,    alpha=0.5, hatch=HATCH_TEST, label="UDE (CV train, test)"),
-        Patch(facecolor=UDE_FULL_COLOR, alpha=0.5, label="UDE (full, train)"),
-        Patch(facecolor=UDE_FULL_COLOR, alpha=0.5, hatch=HATCH_TEST, label="UDE (full, test)"),
-        Patch(facecolor=ODE_FULL_COLOR, alpha=0.5, label="ODE (full, train)"),
-        Patch(facecolor=ODE_FULL_COLOR, alpha=0.5, hatch=HATCH_TEST, label="ODE (full, test)"),
-    ]
-    ax.legend(handles=legend_handles, loc="upper right", ncol=3,
-              title="Model (trained on, evaluated on)", title_fontsize=6)
+    ax.legend(
+        handles=[
+            Patch(facecolor=TRAIN_COLOR,    alpha=0.5, label="Train (CV)"),
+            Patch(facecolor=TEST_COLOR,     alpha=0.5, label="Test (CV)"),
+            plt.Line2D([0], [0], color=UDE_FULL_COLOR, ls="--", lw=0.8, label="UDE full (median)"),
+            plt.Line2D([0], [0], color=ODE_FULL_COLOR, ls="--", lw=0.8, label="ODE full (median)"),
+        ],
+        loc="upper right", frameon=False, ncol=2,
+    )
 
     fig.tight_layout()
     out = out_dir / "rmse_per_fold_boxplot.pdf"
